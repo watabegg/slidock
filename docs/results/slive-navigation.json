@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-15",
+  "scope": "Slive native navigation and categorized library",
+  "checks": {
+    "nativeDesktopBuild": "passed",
+    "linuxWebKit": {
+      "assertions": 28,
+      "passed": true,
+      "sourceRestored": true
+    },
+    "chromium": [
+      "category grouping",
+      "category search",
+      "back shortcut",
+      "search and selected-card focus preservation"
+    ],
+    "pnpmCheck": "passed"
+  },
+  "evidence": [
+    "artifacts/slive-navigation/native-qa.json",
+    "artifacts/slive-navigation/home.png",
+    "apps/slive/artifacts/library-presenter.png",
+    "artifacts/slive-navigation/check.log"
+  ],
+  "notRun": [
+    "macOS",
+    "Windows",
+    "physical dual-monitor placement"
+  ]
+}

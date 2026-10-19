@@ -1,4 +1,6 @@
 import type {
+  NativeTheme as ContractNativeTheme,
+  NativePreferences as ContractNativePreferences,
   NativeBridgeDiagnostic as ContractNativeBridgeDiagnostic,
   NativeBridgeFailure as ContractNativeBridgeFailure,
   NativeBridgeReady as ContractNativeBridgeReady,
@@ -10,6 +12,8 @@ import type {
 } from '@slidock/protocol/contracts';
 
 declare global {
+  type NativeTheme = ContractNativeTheme;
+  type NativePreferences = ContractNativePreferences;
   type NativeNavigationAction = ContractNativeNavigationAction;
   type NativeDeck = ContractNativeDeck;
   type NativeFrameState = ContractNativeFrameState;
@@ -75,6 +79,10 @@ declare global {
   }
 
   interface NativeCommandMap {
+    settings_get: { args: undefined; result: NativePreferences };
+    settings_theme: { args: { theme: NativeTheme }; result: void };
+    settings_connect: { args: { connection: 'local' | 'web'; url: string }; result: void };
+    settings_restart: { args: undefined; result: void };
     catalog_page: { args: { cursor: string | null }; result: string };
     snapshot: { args: undefined; result: NativeSnapshot };
     transition: { args: { input: NativeTransitionInput }; result: NativeSession };
@@ -93,6 +101,7 @@ declare global {
     };
     displays: { args: undefined; result: NativeDisplay[] };
     swap_windows: { args: undefined; result: string };
+    audience_exit_fullscreen: { args: undefined; result: void };
     audience_display: {
       args: { index: number | null; fullscreen: boolean };
       result: string;
@@ -112,9 +121,11 @@ declare global {
     payload: Payload;
   }
 
-  type NativeTauriListen = (
-    event: 'session',
-    handler: (event: NativeTauriEvent<NativeSession>) => void,
+  type NativeTauriListen = <Event extends 'session' | 'appearance'>(
+    event: Event,
+    handler: (
+      event: NativeTauriEvent<Event extends 'session' ? NativeSession : NativeTheme>,
+    ) => void,
   ) => Promise<() => void>;
 
   interface NativeFrameStats {
@@ -127,6 +138,7 @@ declare global {
 
   interface NativeFrameCallbacks {
     onRendered?: (report: NativeRenderedReport, origin: string) => void;
+    onEscape?: () => void;
     onInput?: (action: NativeNavigationAction) => void;
     onDiagnostic?: (diagnostic: NativeBridgeDiagnostic, origin: string) => void;
     onError?: (message: string) => void;

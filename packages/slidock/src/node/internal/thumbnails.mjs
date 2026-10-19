@@ -114,7 +114,7 @@ async function closeQuietly(resource) {
   }
 }
 
-async function waitForRenderedSlide(page, id) {
+export async function waitForRenderedSlide(page, id) {
   await page.locator(SLIDE_SELECTOR).waitFor({ state: 'visible', timeout: 30_000 });
   await page.waitForFunction(
     (selector) => {

@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-15",
+  "scope": "Slive icon, connection settings and appearance",
+  "checks": {
+    "linuxWebKitLocal": {
+      "passed": true,
+      "assertions": 32,
+      "sourceRestored": true
+    },
+    "linuxWebKitSavedRemoteConnection": {
+      "passed": true,
+      "assertions": 29,
+      "sourceRestored": true
+    },
+    "rustLibraryTests": {
+      "passed": true,
+      "tests": 32
+    },
+    "chromiumSettings": [
+      "icon visible",
+      "light and dark",
+      "system appearance changes",
+      "connection failure preserves settings",
+      "connection success requests restart",
+      "unsaved notes block reconnect"
+    ],
+    "chromiumRemoteTransport": "33 existing checks passed for each of HTTP and HTTPS",
+    "pnpmCheck": "passed"
+  },
+  "evidence": [
+    "artifacts/slive-settings/native-qa.json",
+    "artifacts/slive-settings/restart/native-static.json",
+    "artifacts/slive-settings/settings-dark-presenter.png",
+    "artifacts/slive-settings/settings-light-presenter.png",
+    "artifacts/slive-settings/rust-tests.log",
+    "artifacts/slive-settings/browser.log",
+    "artifacts/slive-settings/check.log"
+  ],
+  "limitations": [
+    "macOS and Windows not run",
+    "physical dual-monitor placement not run",
+    "authentication header entry is not exposed in settings"
+  ]
+}

@@ -67,3 +67,7 @@ pnpm verify:workers-slive && pnpm verify:slive
 ```bash
 CARGO_BUILD_JOBS=2 cargo test --locked --manifest-path apps/slive/Cargo.toml -p slive-core -p slive
 ```
+
+### Linux のアプリ一覧に登録
+
+デスクトップ版をビルドした後、`node apps/slive/scripts/install-desktop.mjs` をリポジトリ直下から実行すると、現在のユーザーのアプリ一覧に Slive を登録します。設定ファイルを変える場合は第1引数にパスを指定します。登録したランチャーは、このチェックアウトの開発用バイナリを起動します。

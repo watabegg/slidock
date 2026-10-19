@@ -176,3 +176,38 @@ test('v1 frames keep their original URL and do not require a revision query in a
   });
   assert.equal(controller.stats.acknowledgements, 1);
 });
+
+test('Escape is accepted only from the active authenticated slide, never preview', () => {
+  const { controller, frame } = createController({ decks: [playbackDeck] });
+  let escapes = 0;
+  controller.callbacks.onEscape = () => escapes++;
+  controller.update(state());
+  const event = {
+    source: frame.contentWindow,
+    origin: 'https://slides.example.test',
+    data: { nativeEscape: true, documentToken: 'document-1' },
+  };
+  controller.message(event);
+  assert.equal(escapes, 0, 'not ready');
+  controller.message({
+    ...event,
+    data: {
+      nativeBridgeReady: {
+        protocolVersion: 1,
+        deckId: state().deckId,
+        documentToken: 'document-1',
+        mount: new URL(frame.src).searchParams.get('nativeMount'),
+      },
+    },
+  });
+  controller.message({ ...event, origin: 'https://untrusted.example' });
+  controller.message({ ...event, source: {} });
+  controller.message({ ...event, data: { nativeEscape: true, documentToken: 'stale' } });
+  assert.equal(escapes, 0);
+  controller.message(event);
+  assert.equal(escapes, 1);
+  controller.preview = true;
+  controller.message(event);
+  assert.equal(escapes, 1);
+  assert.equal(controller.latest.page, 1);
+});

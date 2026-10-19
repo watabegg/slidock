@@ -1,7 +1,8 @@
 # 開発の入口
 
-- 最初に `README.md`、`docs/DECISIONS.md`、`TODO.md` を読む。過去の計画・実験記録は設計判断集から Git 履歴を参照する。
-- Slive は `apps/slive/`、Slidock は `packages/slidock/`、共有仕様は `packages/protocol/`。
+- 最初に `README.md`、`docs/DECISIONS.md`、`TODO.md` を読む。完了済み計画は `docs/archive/`、過去の実験記録は設計判断集から Git 履歴を参照する。
+- Slidock は複数の Slidev 資料の共通バンドルと Web フロントエンド API を提供するフレームワーク。本体は `packages/slidock/`、利用例は `examples/`、Slive は `apps/slive/`、共有仕様は `packages/protocol/`。
+- `pnpm dev:slidock` は `examples/official-themes/` のデモを起動する。Web アプリの新設やフレームワークの責務変更を前提にしない。
 - 元の `../slidev-lab` とテーマ `../slidev-watabegg` は変更しない。
 - 機能の動作を保ちながら段階的に製品化する。移植済みと製品完成を区別し、未検証事項を隠さない。
 - 採用した設計と理由は `docs/DECISIONS.md`、検証の要約は `docs/results/`、生ログ・生成物は無視対象の `artifacts/` に残す。`TODO.md` は未完了の課題を管理する。

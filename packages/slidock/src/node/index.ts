@@ -9,3 +9,5 @@ export type {
   NormalizedHubConfig,
 } from './config.js';
 export { generateThumbnails } from './thumbnail.js';
+export { devHub } from './dev.js';
+export type { HubDevOptions } from './dev.js';

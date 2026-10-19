@@ -53,7 +53,7 @@ impl Drop for ConfigWriteLock {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -176,7 +176,7 @@ fn require_directory(path: &Path, field: &str) -> Result<PathBuf, String> {
     Ok(canonical)
 }
 
-fn normalize_remote_origin(origin: &str) -> Result<String, String> {
+pub fn normalize_remote_origin(origin: &str) -> Result<String, String> {
     let invalid = || "viewerOrigin must be an HTTPS root or exact HTTP loopback root".to_owned();
     if origin.is_empty()
         || origin

@@ -128,6 +128,29 @@ import '@slidock/slidock/frontend/style.css';
 createApp(App).mount('#app');
 ```
 
+## ローカル開発とホット更新
+
+このリポジトリでは `pnpm dev:slidock` で起動します。Markdown の保存は Slidev、ホームの Vue/CSS の保存は Vite が反映します。タイトル・ページ数・サムネイルも更新されます。静的ビルドの確認には `pnpm build:slidock` と `pnpm preview:slidock` を使います。
+
+独自の構成では Node API を使えます。既存のビルド設定を渡し、終了時に `close()` を呼びます。`outDir` は開発用キャッシュの配置にも使われます。
+
+```ts
+import { devHub } from '@slidock/slidock';
+
+const server = await devHub({
+  baseDir: process.cwd(),
+  sourceRoot: 'slides',
+  outDir: 'artifacts/dev',
+  frontendEntry: 'src/home.ts',
+  port: 4174,
+});
+console.log(server.url);
+// 終了時
+await server.close();
+```
+
+開発サーバーはローカル編集用です。デッキの追加・削除、プロファイルやエントリー設定を変更した場合は再起動してください。サムネイル生成にはセットアップ済みの Chromium が必要です。
+
 ## 互換用のフロントエンドマウント（`@slidock/slidock/frontend`）
 
 画面描画には、同パッケージの公開サブパスエクスポート `@slidock/slidock/frontend` が提供する `mountHub` 関数を使用します。

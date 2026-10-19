@@ -17,6 +17,8 @@ export function mountLibrary(options: {
   const grid = document.getElementById('library-grid')!;
   const search = document.getElementById('library-search') as HTMLInputElement;
   const status = document.getElementById('library-status')!;
+  const navigation = document.getElementById('library-categories')!;
+  let selected: string | null = null;
   let catalog = new Map<string, CatalogDeck>();
   let loading = true;
   let failed = false;
@@ -24,7 +26,13 @@ export function mountLibrary(options: {
     const query = search.value.trim().toLocaleLowerCase();
     const decks = options.decks.filter((deck) => {
       const item = catalog.get(deck.id);
-      return [deck.id, item?.title, ...Object.values(item?.frontmatter ?? {}).map(text)]
+      if (selected !== null && JSON.stringify(item?.categoryPath ?? []) !== selected) return false;
+      return [
+        deck.id,
+        item?.title,
+        ...(item?.categoryPath ?? []),
+        ...Object.values(item?.frontmatter ?? {}).map(text),
+      ]
         .join(' ')
         .toLocaleLowerCase()
         .includes(query);
@@ -34,74 +42,113 @@ export function mountLibrary(options: {
       : failed
         ? '表紙を読み込めませんでした。資料名から開けます。'
         : decks.length
-          ? `${decks.length} 件の資料`
+          ? ''
           : '一致する資料がありません';
-    grid.replaceChildren(
-      ...decks.map((deck) => {
-        const item = catalog.get(deck.id);
+    const groups = new Map<string, HTMLElement>();
+    grid.replaceChildren();
+    for (const deck of decks) {
+      const category = catalog.get(deck.id)?.categoryPath ?? [];
+      const key = JSON.stringify(category);
+      let cards = groups.get(key);
+      if (!cards) {
+        const section = document.createElement('section');
+        section.className = 'library-category';
+        const heading = document.createElement('h2');
+        heading.textContent = category.length ? category.join(' / ') : '未分類';
+        cards = document.createElement('div');
+        cards.className = 'category-decks';
+        section.append(heading, cards);
+        grid.append(section);
+        groups.set(key, cards);
+      }
+      const item = catalog.get(deck.id);
+      const button = document.createElement('button');
+      button.className = 'deck-card';
+      button.dataset.deckId = deck.id;
+      const cover = document.createElement('div');
+      cover.className = 'deck-cover';
+      const fallback = document.createElement('span');
+      fallback.className = 'cover-fallback';
+      fallback.textContent = item?.title || deck.id;
+      cover.append(fallback);
+      if (item) {
+        const src = new URL(item.thumbnail.src, options.origin);
+        // Keep authenticated thumbnails on the same transport as the catalog.
+        if (src.origin === new URL(options.origin).origin && !src.username && !src.password) {
+          const image = document.createElement('img');
+          image.alt = '';
+          image.loading = 'lazy';
+          image.src = src.href;
+          image.onerror = () => image.remove();
+          cover.append(image);
+        }
+      }
+      const info = document.createElement('div');
+      info.className = 'deck-info';
+      const title = document.createElement('h3');
+      title.textContent = item?.title || deck.id;
+      const description = document.createElement('p');
+      description.textContent = text(item?.frontmatter.subtitle || item?.frontmatter.description);
+      const meta = document.createElement('div');
+      meta.className = 'deck-meta';
+      for (const value of [
+        text(item?.frontmatter.author),
+        text(item?.frontmatter.date),
+        `${deck.clickTotals.length} ページ`,
+      ]) {
+        if (!value) continue;
+        const span = document.createElement('span');
+        span.textContent = value;
+        meta.append(span);
+      }
+      const tags = document.createElement('div');
+      tags.className = 'deck-tags';
+      const values = item?.frontmatter.tags;
+      for (const value of Array.isArray(values) ? values : values ? [values] : []) {
+        if (!text(value)) continue;
+        const tag = document.createElement('span');
+        tag.textContent = text(value);
+        tags.append(tag);
+      }
+      info.append(title, description, meta, tags);
+      button.append(cover, info);
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          await options.open(deck.id);
+        } finally {
+          button.disabled = false;
+        }
+      };
+      cards.append(button);
+    }
+  };
+  const drawNavigation = (): void => {
+    const categories = new Map<string, string>();
+    for (const deck of options.decks) {
+      const path = catalog.get(deck.id)?.categoryPath ?? [];
+      categories.set(JSON.stringify(path), path.length ? path.join(' / ') : '未分類');
+    }
+    const entries: Array<[string | null, string]> = [[null, 'すべて'], ...categories];
+    navigation.replaceChildren(
+      ...entries.map(([key, label]) => {
         const button = document.createElement('button');
-        button.className = 'deck-card';
-        button.dataset.deckId = deck.id;
-        const cover = document.createElement('div');
-        cover.className = 'deck-cover';
-        const fallback = document.createElement('span');
-        fallback.className = 'cover-fallback';
-        fallback.textContent = item?.title || deck.id;
-        cover.append(fallback);
-        if (item) {
-          const src = new URL(item.thumbnail.src, options.origin);
-          // Keep authenticated thumbnails on the same transport as the catalog.
-          if (src.origin === new URL(options.origin).origin && !src.username && !src.password) {
-            const image = document.createElement('img');
-            image.alt = '';
-            image.loading = 'lazy';
-            image.src = src.href;
-            image.onerror = () => image.remove();
-            cover.append(image);
-          }
-        }
-        const info = document.createElement('div');
-        info.className = 'deck-info';
-        const title = document.createElement('h2');
-        title.textContent = item?.title || deck.id;
-        const description = document.createElement('p');
-        description.textContent = text(item?.frontmatter.subtitle || item?.frontmatter.description);
-        const meta = document.createElement('div');
-        meta.className = 'deck-meta';
-        for (const value of [
-          text(item?.frontmatter.author),
-          text(item?.frontmatter.date),
-          `${deck.clickTotals.length} ページ`,
-        ]) {
-          if (!value) continue;
-          const span = document.createElement('span');
-          span.textContent = value;
-          meta.append(span);
-        }
-        const tags = document.createElement('div');
-        tags.className = 'deck-tags';
-        const values = item?.frontmatter.tags;
-        for (const value of Array.isArray(values) ? values : values ? [values] : []) {
-          if (!text(value)) continue;
-          const tag = document.createElement('span');
-          tag.textContent = text(value);
-          tags.append(tag);
-        }
-        info.append(title, description, meta, tags);
-        button.append(cover, info);
-        button.onclick = async () => {
-          button.disabled = true;
-          try {
-            await options.open(deck.id);
-          } finally {
-            button.disabled = false;
-          }
+        button.type = 'button';
+        button.textContent = label;
+        button.setAttribute('aria-current', String(selected === key));
+        button.onclick = () => {
+          selected = key;
+          for (const item of navigation.querySelectorAll('button'))
+            item.setAttribute('aria-current', String(item === button));
+          draw();
+          document.querySelector('.library-content')?.scrollTo({ top: 0 });
         };
         return button;
       }),
     );
   };
   search.oninput = draw;
+  drawNavigation();
   draw();
   void createCatalogClient(
     createPaginatedCatalogSource({
@@ -125,6 +172,7 @@ export function mountLibrary(options: {
     })
     .finally(() => {
       loading = false;
+      drawNavigation();
       draw();
     });
 }

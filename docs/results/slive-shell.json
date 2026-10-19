@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-15",
+  "scope": "Slive desktop identity and sidebar home",
+  "checks": {
+    "linuxWebKit": {
+      "passed": true,
+      "assertions": 35,
+      "sourceRestored": true
+    },
+    "chromium": "category selection and settings regression passed",
+    "desktopEntry": "desktop-file-validate passed",
+    "gtkApplicationId": "local.slidev.lab acquired on session bus",
+    "installedIcon": "SHA256 matches approved icon.png",
+    "pnpmCheck": "passed"
+  },
+  "evidence": [
+    "artifacts/slive-shell/native-qa.json",
+    "artifacts/slive-shell/home.png",
+    "artifacts/slive-shell/browser.log",
+    "artifacts/slive-shell/build.log",
+    "artifacts/slive-shell/check.log"
+  ],
+  "limitations": [
+    "macOS and Windows not executed",
+    "Wayland desktop identity verified; X11 taskbar appearance not verified"
+  ]
+}

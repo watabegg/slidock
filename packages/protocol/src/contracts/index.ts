@@ -34,3 +34,5 @@ export type {
   NativeRenderedReport,
 } from './wire.js';
 export * from './jobs.js';
+
+export type { NativeTheme, NativePreferences } from './preferences.js';

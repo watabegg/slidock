@@ -4,3 +4,5 @@ pub mod paths;
 pub mod server;
 
 pub mod catalog;
+
+pub mod preferences;

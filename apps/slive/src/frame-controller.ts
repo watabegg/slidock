@@ -22,6 +22,7 @@ interface NativeFrameSlot {
 
 interface NativeFrameControllerCallbacks {
   onRendered: (report: NativeRenderedReport, origin: string) => void;
+  onEscape: () => void;
   onInput: (action: NativeNavigationAction) => void;
   onDiagnostic: (diagnostic: NativeBridgeDiagnostic, origin: string) => void;
   onError: (message: string) => void;
@@ -33,6 +34,7 @@ interface NativeFrameMessage {
   nativeBridgeReady?: NativeBridgeReady;
   nativeFailure?: NativeBridgeFailure;
   nativeDiagnostic?: NativeBridgeDiagnostic;
+  nativeEscape?: boolean;
   nativeInput?: NativeNavigationAction;
   documentToken?: string;
   nativeRendered?: NativeRenderedReport;
@@ -45,6 +47,7 @@ function isNativeFrameMessage(value: unknown): value is NativeFrameMessage {
     (!Object.hasOwn(data, 'nativeBridgeReady') || isNativeBridgeReady(data.nativeBridgeReady)) &&
     (!Object.hasOwn(data, 'nativeFailure') || isNativeBridgeFailure(data.nativeFailure)) &&
     (!Object.hasOwn(data, 'nativeDiagnostic') || isNativeBridgeDiagnostic(data.nativeDiagnostic)) &&
+    (!Object.hasOwn(data, 'nativeEscape') || data.nativeEscape === true) &&
     (!Object.hasOwn(data, 'nativeInput') || isNativeNavigationAction(data.nativeInput)) &&
     (!Object.hasOwn(data, 'documentToken') || typeof data.documentToken === 'string') &&
     (!Object.hasOwn(data, 'nativeRendered') || isNativeRenderedReport(data.nativeRendered))
@@ -68,13 +71,14 @@ window.NativeFrameController = class implements NativeFrameControllerInstance {
       decks,
       onRendered = () => {},
       onInput = () => {},
+      onEscape = () => {},
       onDiagnostic = () => {},
       onError = () => {},
     }: { origin: string; decks?: NativeDeck[] } & NativeFrameCallbacks,
   ) {
     this.origin = origin;
     this.decks = decks ?? [];
-    this.callbacks = { onRendered, onInput, onDiagnostic, onError };
+    this.callbacks = { onRendered, onInput, onEscape, onDiagnostic, onError };
     this.preview = frame.id === 'next-preview';
     this.active = this.slot(frame);
     this.standby = null;
@@ -234,14 +238,15 @@ window.NativeFrameController = class implements NativeFrameControllerInstance {
       this.fail(slot, data.nativeFailure.message);
     }
     if (
-      data.nativeInput &&
+      (data.nativeInput || data.nativeEscape) &&
       data.documentToken === slot.token &&
       slot === this.active &&
       !this.preview &&
       slot.ready &&
       slot.deckId === this.latest?.deckId
     ) {
-      this.callbacks.onInput(data.nativeInput);
+      if (data.nativeEscape) this.callbacks.onEscape();
+      else if (data.nativeInput) this.callbacks.onInput(data.nativeInput);
     }
     if (data.nativeRendered) {
       const report = data.nativeRendered;

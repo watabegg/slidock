@@ -1,12 +1,14 @@
-# TODO: 公開ジョブ・CLI・進捗確認
+# 完了済み: 公開ジョブ・CLI・進捗確認
 
-> 運用契約: このファイルは in-place 更新する。再開時は全文と計画書の Hard Gate / Out of scope / 現在 Step を読み、現在位置を確認する。設計変更は計画書へ反映する。
+> 2026-10-10に全7タスク完了。以下は当時の実装記録です。現在の運用仕様は [公開ジョブガイド](../../guides/publication-jobs.md) を参照してください。
+
+> 当時の運用契約: このファイルは in-place 更新する。再開時は全文と計画書の Hard Gate / Out of scope / 現在 Step を読み、現在位置を確認する。設計変更は計画書へ反映する。
 
 - 計画書: [publication-jobs-plan.html](publication-jobs-plan.html)
 - モック: [job-status-mock.html](publication-jobs-assets/mock/job-status-mock.html)（2026-10-10 ユーザー承認済み）
 - goal prompt: なし（別セッションへの引き継ぎは未依頼）
 - 計画検証日: 2026-10-10（main@2d96e53）
-- アクティブタスク: 全7タスク完了。取消なし。検証記録: [publication-jobs.json](../results/publication-jobs.json)。
+- アクティブタスク: 全7タスク完了。取消なし。検証記録: [publication-jobs.json](../../results/publication-jobs.json)。
 - 状態: [ ] 未着手 / [x] 完了 / [!] blocked（理由必須）/ [-] cancelled（計画改訂・理由必須）
 - 完了条件: 全7タスクの消し込みと Gate 通過。一部取消時は取消一覧を残す。
 - 非冪等操作: 実行直前に「実行開始」を記録し、再開時は副作用を確認する。

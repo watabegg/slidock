@@ -56,9 +56,25 @@ pnpm exec playwright install --with-deps chromium
 
 コンポーネントごとのビルドおよび開発サーバー起動コマンドは以下のとおりです。
 
-- **Slidock**: `pnpm build:slidock` / `pnpm dev:slidock`
+- **フレームワークのパッケージ**: `pnpm build:packages`
+- **公式テーマのデモ**: `pnpm dev:slidock`（開発）/ `pnpm build:slidock` → `pnpm preview:slidock`（静的ビルドの確認）
+- **共有バンドルの回帰用フィクスチャ**: `pnpm build:slidock:fixtures` → `pnpm verify:slidock:fixtures`
 - **Slive**: `pnpm slive:prepare` / `pnpm build:slive-ui`
 - **Workers**: `pnpm build:workers` / `pnpm dev:workers`
+
+### localhost:4174 の実行元
+
+`pnpm dev:slidock` → `scripts/dev-official-themes.mjs` → `@slidock/slidock` の `devHub()` という順に起動します。Node API はビルド済みの `packages/slidock/dist/node/` から読み込まれます。
+
+| 対象 | 編集する場所 |
+| --- | --- |
+| デモのホーム | `examples/official-themes/App.vue`（`home.ts` からマウント） |
+| 共通 Vue コンポーネントと CSS | `packages/slidock/src/frontend/` |
+| デモの資料 | `examples/official-themes/slides/` |
+| 資料・テーマ・ホームの指定 | `scripts/official-themes-config.mjs` |
+| 開発サーバー本体 | `packages/slidock/src/node/dev.ts`、`src/node/internal/dev.mjs` |
+
+開発時は Vite がホームを配信し、資料ごとの Slidev 開発サーバーへ振り分けます。Node 側の実装変更は再ビルド・再起動が必要です。静的ビルドの出力先は `packages/slidock/artifacts/official-themes/site/` で、`preview:slidock` がその内容を配信します。`apps/slidock-server`（既定4180番）と `apps/slidock-worker` は公開・配信用の別エントリーポイントです。
 
 各コンポーネントの詳細な利用手順は、以下のドキュメントを参照してください。
 
@@ -138,6 +154,8 @@ CARGO_BUILD_JOBS=2 cargo test --locked --manifest-path apps/slive/Cargo.toml -p 
 必須の SDK が導入されていない環境では検証を行わず「未検証」として扱ってください。Node.js 側のテストが合格しても、ネイティブ機能が合格したとはみなせません。
 
 ## CI パイプラインと検証記録の扱い
+
+機能ごとの記録は [検証記録の一覧](results/README.md)、完了した実装計画は [アーカイブ](archive/README.md) を参照してください。
 
 CI のワークフロー定義は [../.github/workflows/checks.yml](../.github/workflows/checks.yml) に記載されており、portable job 内で `verify:server` と `verify:publication-jobs` の後、Rust ビルド、Linux 上の Xvfb を用いたネイティブ検証を実行する設定です。GitHub Actions 上の実際の実行環境とローカル環境での計測結果は異なるため、本文書では CI が成功したとは記載しません。また、リポジトリ内の `results/final-regression.json` は 2026-10-10 時点のローカル検証スナップショットであり、現在の CI 成功を証明する記録ではありません。
 

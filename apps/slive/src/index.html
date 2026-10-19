@@ -12,12 +12,12 @@
       <button
         id="home-button"
         class="icon-button"
-        title="資料一覧へ"
-        aria-label="資料一覧へ"
-        data-icon="home"
+        title="戻る（Alt + ←）"
+        aria-label="一覧に戻る"
+        data-icon="back"
       ></button>
-      <img class="app-brand-icon" src="slive.svg" width="32" height="32" alt="" />
-      <h1 id="deck-title">資料</h1>
+      <img class="app-brand-icon" src="slive.svg" width="30" height="30" alt="Slive" />
+      <h1 id="deck-title"></h1>
       <div id="status" role="status"></div>
       <details id="display-settings">
         <summary class="icon-button" title="投影先の設定" aria-label="投影先の設定">
@@ -40,23 +40,40 @@
           <p id="display-status" role="status"></p>
         </div>
       </details>
+      <button
+        class="icon-button"
+        data-open-settings
+        aria-label="設定"
+        title="設定"
+        data-icon="settings"
+      ></button>
     </header>
     <section id="library" hidden>
-      <div class="library-heading">
-        <div>
-          <h2>資料を選ぶ</h2>
-          <p id="library-status" role="status"></p>
+      <aside class="library-sidebar">
+        <div class="library-brand">
+          <img class="app-brand-icon" src="slive.svg" width="112" height="112" alt="" />
+          <h1>Slive</h1>
         </div>
-        <label class="search"
-          ><span data-icon="search"></span
-          ><input
-            id="library-search"
-            type="search"
-            placeholder="資料を検索"
-            aria-label="資料を検索"
-        /></label>
+        <nav id="library-categories" aria-label="カテゴリ"></nav>
+        <button class="sidebar-settings" data-open-settings aria-label="設定" title="設定">
+          <span data-icon="settings"></span><span>設定</span>
+        </button>
+      </aside>
+      <div class="library-content">
+        <div class="library-heading">
+          <label class="search">
+            <span data-icon="search"></span>
+            <input
+              id="library-search"
+              type="search"
+              placeholder="資料を検索"
+              aria-label="資料を検索"
+            />
+          </label>
+        </div>
+        <p id="library-status" role="status"></p>
+        <div id="library-grid"></div>
       </div>
-      <div id="library-grid"></div>
     </section>
     <main id="presentation">
       <div id="viewer">
@@ -148,6 +165,59 @@
         ></button>
       </div>
     </footer>
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <div class="settings-header">
+        <h1 id="settings-title">設定</h1>
+        <button
+          id="settings-close"
+          class="icon-button"
+          aria-label="設定を閉じる"
+          title="閉じる"
+          data-icon="close"
+        ></button>
+      </div>
+      <div class="settings-content">
+        <section class="settings-section" aria-labelledby="appearance-title">
+          <h2 id="appearance-title">外観</h2>
+          <div class="theme-options" role="group" aria-label="外観">
+            <button data-theme-choice="light" aria-pressed="false">
+              <span data-icon="sun"></span>ライト
+            </button>
+            <button data-theme-choice="dark" aria-pressed="false">
+              <span data-icon="moon"></span>ダーク
+            </button>
+            <button data-theme-choice="system" aria-pressed="false">
+              <span data-icon="monitor"></span>システム
+            </button>
+          </div>
+        </section>
+        <section class="settings-section" aria-labelledby="connection-title">
+          <h2 id="connection-title">接続先</h2>
+          <form id="connection-form">
+            <div class="connection-options">
+              <label><input type="radio" name="connection" value="local" />このPCの資料</label>
+              <label><input type="radio" name="connection" value="web" />Slidock のURL</label>
+            </div>
+            <p id="local-unavailable" class="settings-hint" hidden>
+              ローカル資料を指定して起動すると選べます。
+            </p>
+            <label id="connection-url-label" for="connection-url">URL</label>
+            <input
+              id="connection-url"
+              type="url"
+              placeholder="https://slides.example.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <p id="connection-hint" class="settings-hint">localhost のURLも指定できます。</p>
+            <div class="settings-actions">
+              <button id="connection-apply" type="submit">接続して再起動</button>
+            </div>
+          </form>
+        </section>
+        <p id="settings-status" role="status"></p>
+      </div>
+    </dialog>
     <script src="frame-controller.js"></script>
     <script src="app.js"></script>
   </body>
