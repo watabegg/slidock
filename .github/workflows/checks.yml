@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24.15.0
+          node-version: 24.22.1
       - run: npm install --global pnpm@12.3.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24.15.0
+          node-version: 24.22.1
       - run: npm install --global pnpm@12.3.4
       - run: pnpm install --frozen-lockfile
       - name: Install Linux desktop SDK and virtual display
