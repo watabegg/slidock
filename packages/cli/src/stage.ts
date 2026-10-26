@@ -162,12 +162,12 @@ async function runStageDoctor(parsed: ParsedCommand, cwd: string, json: boolean)
   )!;
   const checks: DoctorCheck[] = [];
   const [major, minor, patch] = process.versions.node.split('.').map(Number);
-  const nodeReady = major > 24 || (major === 24 && (minor > 15 || (minor === 15 && patch >= 0)));
+  const nodeReady = major > 24 || (major === 24 && (minor > 22 || (minor === 22 && patch >= 1)));
   doctorCheck(
     checks,
     'node-version',
     nodeReady,
-    nodeReady ? `Node.js ${process.versions.node}` : 'Node.js 24.15.0 or newer is required',
+    nodeReady ? `Node.js ${process.versions.node}` : 'Node.js 24.22.1 or newer is required',
   );
 
   let runtime: unknown;
