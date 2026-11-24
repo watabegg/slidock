@@ -6,6 +6,7 @@
 
 | 日付 | 対象と記録 | 記録内のコミット情報 |
 | --- | --- | --- |
+| 2026-11-24 | [portable の CSS 検査修正と全段階検証](portable-ci-fix.json) | 基点 `a5c2e96`＋未コミット差分 |
 | 2026-11-24 | [公式テーマのローカル画像・frontmatter の相対画像](relative-frontmatter-images.json) | 未コミット差分 |
 | 2026-10-22 | [Slive ランチャー上の大きさ・見た目の中心](slive-icon-optical.json) | 未コミット差分 |
 | 2026-10-22 | [Slive 原本形状に復元・透明背景と全体拡大](slive-icon-original.json) | 未コミット差分 |

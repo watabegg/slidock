@@ -1,0 +1,129 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "a5c2e960737660bc852c85827986eaa7eb38e93d",
+  "scope": "portable の CSS 検査修正。未コミット差分。本体・例の CSS と設計判断 §19 は変更なし。",
+  "status": "passed",
+  "cause": {
+    "facts": [
+      "修正前の node scripts/verify-web-customization.mjs は行163で終了コード1。document.documentElement の背景色は透明。",
+      "35f5fbe で :root の背景色・ホストのリセットが style.css から site.css へ分離された。",
+      "examples/custom-frontend/themed.ts は style.css と theme.css を読み込み、site.css は読み込まない。",
+      "style.css の .library は --hub-background を参照し、theme.css が #fff8ee を設定する。"
+    ],
+    "judgment": "検査が分離前のグローバル背景色を期待していた。コンポーネントの背景色を検査し、ホストの背景が透明のまま保たれることも確認する。"
+  },
+  "commands": [
+    {
+      "command": "node scripts/verify-web-customization.mjs",
+      "phase": "before fix",
+      "exitCode": 1,
+      "log": "artifacts/portable-ci-fix/web-before.log"
+    },
+    {
+      "command": "pnpm verify:portable",
+      "exitCode": 0,
+      "log": "artifacts/portable-ci-fix/portable-1.log"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "log": "artifacts/portable-ci-fix/lint.log"
+    },
+    {
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "log": "artifacts/portable-ci-fix/format-check.log"
+    },
+    {
+      "command": "pnpm check",
+      "exitCode": 0,
+      "log": "artifacts/portable-ci-fix/check.log"
+    }
+  ],
+  "portableStages": [
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm test",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:slidock",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm verify:slidock",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm verify:web-customization",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:slidock:fixtures",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm verify:slidock:fixtures",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm slive:prepare",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:slive-ui",
+      "exitCode": 0
+    },
+    {
+      "command": "node apps/slive/scripts/verify-remote.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm build:example:watabegg",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm verify:example:watabegg",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm verify:workers",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @slidock/workers verify:fixtures",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @slidock/workers verify:auth",
+      "exitCode": 0
+    }
+  ],
+  "portableTestTotals": {
+    "tests": 415,
+    "pass": 406,
+    "fail": 0,
+    "skipped": 9
+  },
+  "webChecks": 14,
+  "evidence": [
+    "artifacts/step6/gate.json",
+    "artifacts/step6/custom-theme.png"
+  ],
+  "limitations": [
+    "Linux の既存ローカル環境で実行。GitHub Actions・クリーンコンテナでの実行は未確認。",
+    "PostgreSQL 実環境を必要とする9テストはスキップ。CI の PostgreSQL サービス付き条件とは異なる。",
+    "portable 後の CI 別ステップ（verify:packed-cli、verify:packed-server、verify:server、verify:publication-jobs）と他ジョブは未実行。",
+    "Slive の Chromium プロトコル検証は Rust/Tauri・WebKit・物理2画面の検証ではない。"
+  ],
+  "committed": false,
+  "checkTestTotals": {
+    "tests": 415,
+    "pass": 406,
+    "fail": 0,
+    "skipped": 9
+  }
+}

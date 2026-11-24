@@ -161,9 +161,14 @@ try {
   await page.getByText('Custom Vue dependency', { exact: true }).waitFor();
   check('Custom Vue dependencies outside the entry directory avoid Slidev context injection');
   assert.equal(
-    await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+    await page.locator('.library').evaluate((root) => getComputedStyle(root).backgroundColor),
     'rgb(255, 248, 238)',
   );
+  assert.equal(
+    await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+    'rgba(0, 0, 0, 0)',
+  );
+  check('Component theme overrides work without applying the optional site reset');
   assert.equal(await page.locator('h1').textContent(), 'MY SLIDES');
   assert.equal(await page.locator('.home-hero p').textContent(), 'チーム内の発表資料');
   assert.equal(await page.locator('.brand img').count(), 0);
