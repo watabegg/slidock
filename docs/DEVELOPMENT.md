@@ -118,7 +118,7 @@ pnpm verify:server
 pnpm verify:publication-jobs
 ```
 
-GitHub Actions の portable job では `verify:server` の後に `verify:publication-jobs` を実行する設定です。ワークフロー定義は成功結果を意味しません。実際のローカル検証状況は [publication-jobs.json](results/publication-jobs.json) を参照してください。
+GitHub Actions の server job では `verify:server` の後に `verify:publication-jobs` を実行する設定です。ワークフロー定義は成功結果を意味しません。実際のローカル検証状況は [publication-jobs.json](results/publication-jobs.json) を参照してください。
 
 ## 回帰テストと検証
 
@@ -155,9 +155,64 @@ CARGO_BUILD_JOBS=2 cargo test --locked --manifest-path apps/slive/Cargo.toml -p 
 
 ## CI パイプラインと検証記録の扱い
 
-機能ごとの記録は [検証記録の一覧](results/README.md)、完了した実装計画は [アーカイブ](archive/README.md) を参照してください。
+検査範囲を保ったまま CI の負荷と所要時間を減らすため、[.github/workflows/checks.yml](../.github/workflows/checks.yml) は `changes`、`portable`、`server`、`framework`、`rust-core`、`native` の 6 ジョブ構成としている。基本検査を毎回実行しつつ、変更内容に応じて重い検証対象だけを選択し、独立したスイートを並列に実行できる構成とした。機能ごとの検証一覧は [results/README.md](results/README.md) に、完了した計画は [archive/README.md](archive/README.md) にある。なお、`results/final-regression.json` は 2026-10-10 時点のローカルスナップショットであり、現在の CI 成功を証明するものではない。
 
-CI のワークフロー定義は [../.github/workflows/checks.yml](../.github/workflows/checks.yml) に記載されており、portable job 内で `verify:server` と `verify:publication-jobs` の後、Rust ビルド、Linux 上の Xvfb を用いたネイティブ検証を実行する設定です。GitHub Actions 上の実際の実行環境とローカル環境での計測結果は異なるため、本文書では CI が成功したとは記載しません。また、リポジトリ内の `results/final-regression.json` は 2026-10-10 時点のローカル検証スナップショットであり、現在の CI 成功を証明する記録ではありません。
+### ジョブ構成と変更検出
+
+`rust-core` は `needs` を持たず毎回実行し、`portable`・`server`・`framework`・`native` の 4 ジョブは [scripts/ci-changes.mjs](../scripts/ci-changes.mjs) を実行する `changes` ジョブの完了だけを待って並列に実行可能となる（実際に並列で開始できるかはランナー枠に依存する）。以前は `portable` → `rust-core` → `native` を直列で実行していたが、`native` は必要なビルドを自身のジョブ内で行うため、`portable` や `rust-core` の完了を待たない。
+
+`changes` ジョブは `git diff --no-renames -z` を使い、`push` では `before..after` 全体の差分、プルリクエストでは `merge-base(base.sha, head.sha)..head.sha` の差分を対象に、追加・削除および改名時の旧新両方のパスを収集する。差分の比較ができない場合、初回 `push` のゼロ SHA の場合、未知のイベントの場合、および `workflow_dispatch` による手動実行の場合は、すべての重い検証を実行する判定にする。
+
+`portable` ジョブでは毎回 `pnpm build:packages` に続いて `pnpm check` を実行する。重い検証が不要な変更では軽いビルド（`pnpm build:workers` と `pnpm build:slive-ui`）だけを専用ステップで走らせ、重い検証を実行するときは同じビルドが `verify:portable` 内に含まれるため追加では実行しない。
+
+### ジョブと検証コマンドの対応
+
+各ジョブで実行するコマンドと前提条件は以下のとおり。`rust-core` と `portable` 内の基本検査・軽量ビルドは毎回実行し、それ以外の重い検証は `changes` の判定結果に応じて実行する。
+
+| ジョブ | 実行条件 | 検証コマンド・対象 | 依存サービス・前提 |
+| --- | --- | --- | --- |
+| `portable` | 毎回 | `pnpm build:packages`、`pnpm check`（`lint`, `format:check`, `typecheck`, `test`, `check:boundaries`）、軽量ビルド `pnpm build:workers` / `pnpm build:slive-ui`（重い検証内または専用ステップ） | PostgreSQL `hub` サービスと `HUB_TEST_DATABASE_URL` を維持し、`pnpm check` の DB テストを有効のまま実行 |
+| `portable` | 条件付き | `pnpm verify:portable --skip-checks`（`build:slidock`, `verify:slidock`, `verify:web-customization`, `build:slidock:fixtures`, `verify:slidock:fixtures`, `slive:prepare`, `build:slive-ui`, `node apps/slive/scripts/verify-remote.mjs`, `build:example:watabegg`, `verify:example:watabegg`, `verify:workers`［`build:workers` を含む］, `pnpm --filter @slidock/workers verify:fixtures`, `pnpm --filter @slidock/workers verify:auth` をすべて保持）、`pnpm verify:packed-cli` | 直前の `pnpm check` 成功を前提に `--skip-checks` を指定 |
+| `server` | 条件付き | `pnpm verify:packed-server`、`pnpm verify:server`、`pnpm verify:publication-jobs`（後者 2 つは `build:workers` を含む） | PostgreSQL `hub` と破棄可能な `127.0.0.1:55461/hub_jobs` を別サービスとして維持 |
+| `framework` | 条件付き | `pnpm verify:packed-framework`、`pnpm verify:framework-frontend`、`pnpm verify:pages`（`verify-pages-subpath.mjs` と `verify-pages-dev.mjs` の両方） | なし |
+| `rust-core` | 毎回 | `cargo test --locked --manifest-path apps/slive/Cargo.toml -p slive-core -p slive` | `needs` なしで開始 |
+| `native` | 条件付き | `pnpm build:slidock:fixtures`、`xvfb-run -a dbus-run-session -- sh -c 'pnpm verify:workers-slive && pnpm verify:slive'` | `changes` の完了後、自身のジョブ内でビルドするため `portable` や `rust-core` の完了待ち不要 |
+
+### 変更パスと必要な重い検証スイート
+
+重い検証スイート（`portable`、`framework`、`server`、`native`）の対象判定は保守的に設計している。複数ファイルが変更された場合は、各パスに該当するスイートの和集合を実行する。なお、`docs` 以外の Markdown ファイルを一律に除外対象にすることはない。
+
+| 変更されたパス | 実行する重い検証スイート | 判定理由・補足 |
+| --- | --- | --- |
+| `docs/**`、ルートの `AGENTS.md`、`TODO.md` のみ | なし | `docs` 配下の任意ファイルが該当（ルートの `README.md` や `LICENSE` は除外対象に含まない） |
+| `packages/{protocol,slidev-adapter,slidock}/**` | `portable`, `framework`, `server`, `native` | ビルダー、ブラウザ、CLI、`server` 経由ですべてのスイートが推移的に依存するため |
+| `packages/{cli,slive-tools,server,adapter-cloudflare}/**` または `apps/slidock-worker/**` | `portable`, `server`, `native` | CLI、Workers 配信、公開、native 検証が参照するため |
+| `packages/{adapter-node,storage-s3,storage-gcs,state-postgres,renderer-playwright}/**` または `apps/slidock-server/**` | `server` | Node / packed サーバーおよび公開ジョブが参照するため |
+| `apps/slive/**` | `portable`, `native` | ブラウザの remote 検査も Slive UI 等を参照するため |
+| `examples/**` | `portable`, `framework`, `native` | 公式テーマ、custom frontend、ネイティブと Workers の共通 fixture 群であり、内部の差を細分化せず保守的に扱うため |
+| 上記以外 | `portable`, `framework`, `server`, `native` | `.github/workflows/**`、ルートの `package.json`・`pnpm-lock.yaml`・`pnpm-workspace.yaml`、`scripts/**`、`README.md`、`LICENSE`、新規の未分類パスを含む |
+
+### ビルド再利用・キャッシュ・実行制御
+
+`portable`・`server`・`framework`・`native` の 4 ジョブは、最初に無条件で `pnpm build:packages` を実行して成功後に `SLIDOCK_PACKAGES_BUILT=1` を `GITHUB_ENV` へ設定する。`package.json` の `build:packages:if-needed` スクリプトはこの環境変数が `1` のときだけビルドを省略し、それ以外は `build:packages` へ処理を委譲する。ビルド成果物キャッシュの正しさには依存せず、実行ごとに新しくビルドを行う。
+
+ローカルで `pnpm verify:*` を単体実行する場合は既定の自動ビルドを維持しており、`verify:portable` も最初に一度ビルドして以後は再利用し、既定の `typecheck` と `test` も維持する。`--skip-checks` は直前の `pnpm check` 成功を前提にチェックを省略するフラグであり、手動で指定すればローカルでも省略できる。ローカルで複数コマンドを連続実行する際にビルドを明示的に再利用したい場合は、`pnpm build:packages` の成功後に `SLIDOCK_PACKAGES_BUILT=1 pnpm verify:packed-cli` のようにコマンド単位で渡す。ソースを編集したあとは再度ビルドを実行し、環境変数をシェルへ恒久的に `export` しない。
+
+`actions/cache` による再利用対象と管理方針は次のとおり。
+
+- **pnpm ストア**: `actions/cache` で再利用する。
+- **Playwright ブラウザ**: OS・アーキテクチャ・lockfile のキーでキャッシュする。
+- **apt パッケージ**: ダウンロード済みの `.deb` を `browser` 用と `native` 用に分けてキャッシュする。
+- **Cargo**: `registry` / `git` / `target` を `rust-core` 用と `native` 用に分けてキャッシュし、OS・アーキテクチャ・`rustc` バージョン・manifest・lockfile・commit でキーを構成する。同一 lockfile と toolchain のプレフィックス一致で過去の `target` を再利用する。
+- **OS 依存パッケージの適用**: apt や Playwright の OS 依存インストール処理はキャッシュヒット時にも毎回実行し、OS にインストール済みの状態自体はキャッシュしない。
+
+ワークフロー内で使用する action はすべて `actions` 公式のものとし、commit SHA で固定している。また、`concurrency` はワークフロー・イベント・ref 単位で古い実行を取り消し、`push` とプルリクエストが互いの実行を取り消さないようにしている。
+
+### 所要時間の実績と見積もり
+
+変更前の成功実行（run `45363069940`）における実測時間は、`portable` が 11m47s、`framework` が 3m08s、`rust-core` が 1m18s、`native` が 6m22s であり、`portable` → `rust-core` → `native` の直列実行によって待ち時間を除いても合計約 19m27s を要していた。
+
+変更後はランナー枠が十分に確保できる前提で、`docs` のみなど重い検証を伴わない変更は 3〜5 分、すべての重い検証スイートが実行される変更は 7〜10 分と見込んでいる。ただし、この見積もりは未実測であり、コールドキャッシュやランナー待ちが発生した場合はこれより長くなりうる。また、[Playwright 公式](https://playwright.dev/docs/ci#caching-browsers)もブラウザキャッシュの復元がダウンロードより速いとは限らないと案内しているため、CI 全体やキャッシュによる短縮効果は未検証とし、短縮幅は確定させない（変更の push 後に実測して確認する）。
 
 ## 互換用環境変数と実験コードの分離
 

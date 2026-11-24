@@ -1,0 +1,116 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "4f9f4763199486dd2b1944e69dd17fe0cbe43ebb",
+  "scope": "GitHub Actions optimization; uncommitted changes",
+  "ownedFiles": [
+    ".github/workflows/checks.yml",
+    "package.json",
+    "scripts/verify-portable.mjs",
+    "scripts/ci-changes.mjs",
+    "scripts/ci-changes.test.mjs",
+    "docs/DEVELOPMENT.md",
+    "docs/DECISIONS.md",
+    "docs/results/README.md",
+    "docs/results/ci-optimization.json"
+  ],
+  "baseline": {
+    "runId": 45363069940,
+    "url": "https://github.com/watabegg/slidock/actions/runs/45363069940",
+    "jobSeconds": {
+      "portable": 707,
+      "framework": 188,
+      "rust-core": 78,
+      "native": 382
+    },
+    "criticalPathSecondsExcludingQueue": 1167,
+    "sequence": [
+      "portable",
+      "rust-core",
+      "native"
+    ]
+  },
+  "newJobs": {
+    "changes": "Select heavy suites from the whole push range or PR merge base; manual/unavailable/unknown inputs select all.",
+    "portable": "Always run package builds, pnpm check with PostgreSQL, and light runtime/UI builds. Conditional full portable suite and packed-cli.",
+    "server": "Conditional packed-server, server browser/PostgreSQL and publication-jobs E2E; depends only on changes.",
+    "framework": "Conditional packed-framework, framework-frontend and pages; depends only on changes.",
+    "rust-core": "Always run slive-core/slive tests; no needs.",
+    "native": "Conditional self-contained fixture build, workers-slive and slive native regression; depends only on changes."
+  },
+  "estimatedMinutesNotMeasured": {
+    "withoutHeavySuites": [
+      3,
+      5
+    ],
+    "allSuites": [
+      7,
+      10
+    ],
+    "assumptions": "Sufficient runner slots; queue/cache restore/save overhead can increase duration."
+  },
+  "coverageMap": "docs/DEVELOPMENT.md#ci-パイプラインと検証記録の扱い",
+  "commands": [
+    {
+      "command": "/tmp/slidock-actionlint/actionlint .github/workflows/checks.yml",
+      "toolVersion": "1.7.12",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm format:check",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test scripts/ci-changes.test.mjs",
+      "exitCode": 0,
+      "testsPassed": 6,
+      "log": "artifacts/ci-optimization/ci-changes-tests.log"
+    },
+    {
+      "command": "pnpm verify:packed-server",
+      "exitCode": 0,
+      "behavior": "No reuse variable set: builds all workspace packages, packs and installs nine server packages, verifies HTTP publication.",
+      "log": "artifacts/ci-optimization/verify-packed-server-default.log"
+    },
+    {
+      "command": "SLIDOCK_PACKAGES_BUILT=1 pnpm verify:framework-frontend",
+      "exitCode": 0,
+      "behavior": "Reuses the successfully built workspace packages; real browser checks run.",
+      "log": "artifacts/ci-optimization/verify-framework-frontend-reuse.log"
+    },
+    {
+      "command": "SLIDOCK_PACKAGES_BUILT=1 pnpm check",
+      "exitCode": 0,
+      "skippedDatabaseTests": 9,
+      "log": "artifacts/ci-optimization/check-final.log",
+      "note": "Initial attempt exited 1 during format:check on a concurrently edited protocol test. Subsequent format check and complete rerun passed without editing that file. Final sixth path-CLI test was added after the root test phase and passed in the focused rerun."
+    },
+    {
+      "command": "git diff --check -- .github/workflows/checks.yml package.json scripts/verify-portable.mjs scripts/ci-changes.mjs scripts/ci-changes.test.mjs docs/DEVELOPMENT.md docs/DECISIONS.md docs/results/README.md docs/results/ci-optimization.json",
+      "exitCode": 0
+    }
+  ],
+  "checks": {
+    "originalPortableCommandsRetained": 15,
+    "buildReuse": "Explicit build first; mark SLIDOCK_PACKAGES_BUILT=1 only after success. Standalone verify scripts retain automatic builds by default.",
+    "portableCheckReuse": "CI invokes --skip-checks after pnpm check succeeds. Local default still runs typecheck and test.",
+    "caches": [
+      "pnpm store",
+      "Playwright browser binaries",
+      "apt downloaded .deb files (installation still runs)",
+      "Cargo registry/git/target (core/native separated)"
+    ],
+    "actions": "Only official actions; all pinned to commit SHA.",
+    "concurrency": "Cancel older runs for the same workflow/event/ref."
+  },
+  "limitations": [
+    "No workflow execution or push was performed; CI cache hit/miss, apt configuration and cancellation behavior remain unverified on GitHub runners.",
+    "Native, full portable, publication-jobs and remaining packed E2E were not rerun locally for this CI change.",
+    "Local pnpm check skipped nine tests requiring HUB_TEST_DATABASE_URL. CI retains PostgreSQL services and connection configuration.",
+    "Concurrent changes in protocol, Slive remote verification and other verification scripts belong to another worker and were not edited or reverted.",
+    "No commit or push."
+  ]
+}

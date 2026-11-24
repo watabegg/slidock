@@ -9,8 +9,13 @@ for (const key of Object.keys(env)) {
     delete env[key];
 }
 const commands = [
-  ['pnpm', ['typecheck']],
-  ['pnpm', ['test']],
+  ...(env.SLIDOCK_PACKAGES_BUILT === '1' ? [] : [['pnpm', ['build:packages']]]),
+  ...(process.argv.includes('--skip-checks')
+    ? []
+    : [
+        ['pnpm', ['typecheck']],
+        ['pnpm', ['test']],
+      ]),
   ['pnpm', ['build:slidock']],
   ['pnpm', ['verify:slidock']],
   ['pnpm', ['verify:web-customization']],
@@ -35,4 +40,6 @@ for (const [command, args] of commands) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
+  // Only reuse packages after this process has built them successfully.
+  if (args[0] === 'build:packages') env.SLIDOCK_PACKAGES_BUILT = '1';
 }
