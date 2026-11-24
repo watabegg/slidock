@@ -1,13 +1,15 @@
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from '@slidock/slidock/serve';
 import {
   buildHub,
   generateThumbnails,
+  loadProject,
   normalizeHubConfig,
   type HubBuildOptions,
 } from '@slidock/slidock/node';
-import { resolve } from 'node:path';
+import { basename, extname, resolve } from 'node:path';
 import { type ParseArgsOptionsConfig } from 'node:util';
+import { runProjectCli } from '@slidock/slidock/cli';
 import { CliFailure, failInput, failRuntime } from './errors.js';
 import { emitSuccess } from './output.js';
 import { runHubPublish } from './publish.js';
@@ -37,6 +39,7 @@ type NormalizedHubConfig = Awaited<ReturnType<typeof normalizeHubConfig>>;
 
 const HUB_CONFIG_KEYS = new Set([
   'schemaVersion',
+  'basePath',
   'frontendEntry',
   'navigation',
   'sourceRoot',
@@ -119,6 +122,7 @@ function validateHubConfig(value: unknown): JsonRecord {
 
 function normalizedToOptions(config: NormalizedHubConfig): HubBuildOptions {
   return {
+    basePath: config.basePath,
     sourceRoot: config.sourceRoot,
     outDir: config.outDir,
     dependencyRoot: config.dependencyRoot,
@@ -201,6 +205,47 @@ function hubBuildOptions(): ParseArgsOptionsConfig {
   };
 }
 
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function usesProjectConfig(cwd: string, values: ParsedCommand['values']): Promise<boolean> {
+  const explicit = optionString(values, 'config');
+  if (explicit !== undefined) {
+    const name = basename(explicit);
+    if (name === 'hub.config.json') return false;
+    if (name.startsWith('slidock.config.')) return true;
+    const extension = extname(explicit).toLowerCase();
+    if (['.ts', '.mjs', '.js'].includes(extension)) return true;
+    if (extension === '.json') {
+      try {
+        const value: unknown = JSON.parse(await readFile(resolve(cwd, explicit), 'utf8'));
+        if (isRecord(value) && value.schemaVersion === 1) return false;
+      } catch {
+        // Leave malformed JSON to the selected config loader for its error report.
+      }
+      return true;
+    }
+    return false;
+  }
+
+  for (const name of [
+    'slidock.config.ts',
+    'slidock.config.mjs',
+    'slidock.config.js',
+    'slidock.config.json',
+  ])
+    if (await fileExists(resolve(cwd, name))) return true;
+  if (await fileExists(resolve(cwd, 'hub.config.json'))) return false;
+  return true;
+}
+
 async function runHubBuildOrCheck(
   command: 'build' | 'check',
   parsed: ParsedCommand,
@@ -209,7 +254,64 @@ async function runHubBuildOrCheck(
 ): Promise<void> {
   if (parsed.positionals.length !== 0)
     failInput(`slidock ${command} does not accept positional arguments`);
-  const { options } = await loadHubOptions(cwd, parsed.values);
+  const projectMode = await usesProjectConfig(cwd, parsed.values);
+  const hasLegacyOverrides = [
+    'source-root',
+    'out-dir',
+    'dependency-root',
+    'theme',
+    'frontend-entry',
+    'chromium-executable',
+    'offline',
+    'no-offline',
+    'isolate-decks',
+    'bootstrap',
+  ].some((key) => parsed.values[key] !== undefined);
+
+  let options: HubBuildOptions;
+  if (projectMode && !hasLegacyOverrides) {
+    const config = optionString(parsed.values, 'config');
+    await runProjectCli(
+      [command, ...(config === undefined ? [] : ['--config', config]), ...(json ? ['--json'] : [])],
+      cwd,
+    );
+    return;
+  } else if (projectMode) {
+    const project = await loadProject({
+      root: cwd,
+      ...(optionString(parsed.values, 'config') === undefined
+        ? {}
+        : { config: optionString(parsed.values, 'config') }),
+    });
+    options = { ...project.options };
+    const pathFlags: Array<[string, keyof HubBuildOptions]> = [
+      ['source-root', 'sourceRoot'],
+      ['out-dir', 'outDir'],
+      ['dependency-root', 'dependencyRoot'],
+      ['theme', 'theme'],
+      ['frontend-entry', 'frontendEntry'],
+      ['chromium-executable', 'chromiumExecutable'],
+    ];
+    for (const [flag, key] of pathFlags) {
+      const value = optionString(parsed.values, flag);
+      if (value !== undefined) Object.assign(options, { [key]: callerPath(cwd, value) });
+    }
+    const offline = optionBoolean(parsed.values, 'offline');
+    const noOffline = optionBoolean(parsed.values, 'no-offline');
+    if (offline !== undefined && noOffline !== undefined)
+      failInput('use either --offline or --no-offline');
+    if (offline !== undefined) options.offline = offline;
+    if (noOffline !== undefined) options.offline = !noOffline;
+    const isolateDecks = optionBoolean(parsed.values, 'isolate-decks');
+    if (isolateDecks !== undefined) options.isolateDecks = isolateDecks;
+    const bootstrap = optionString(parsed.values, 'bootstrap');
+    if (bootstrap !== undefined) {
+      if (bootstrap !== 'sync' && bootstrap !== 'tla') failInput('--bootstrap must be sync or tla');
+      options.bootstrap = bootstrap;
+    }
+  } else {
+    ({ options } = await loadHubOptions(cwd, parsed.values));
+  }
   let normalized: NormalizedHubConfig;
   try {
     normalized = await normalizeHubConfig(options);
@@ -233,6 +335,7 @@ async function runHubBuildOrCheck(
         dependencyRoot: normalized.dependencyRoot,
         theme: normalized.theme,
         frontendEntry: normalized.frontendEntry,
+        basePath: normalized.basePath,
         navigation: normalized.navigation,
         ...(normalized.chromiumExecutable === undefined
           ? {}
@@ -265,6 +368,18 @@ async function runHubBuildOrCheck(
         output: result.output,
         receiptPath: result.receiptPath,
         deckCount: result.receipt.decks.length,
+        groups:
+          (
+            result.diagnostics as typeof result.diagnostics & {
+              groupSummary?: Array<{
+                id: string;
+                runtimeVersion: string;
+                theme: string;
+                deckIds: string[];
+                reason: 'compatible' | 'isolated' | 'default';
+              }>;
+            }
+          ).groupSummary ?? [],
       },
       json,
       `Built ${result.receipt.decks.length} decks to ${result.output}`,
@@ -426,10 +541,13 @@ async function hubThumbnail(parsed: ParsedCommand, cwd: string, json: boolean): 
 
 function hubHelp(): string {
   return [
-    'Usage: slidock <build|check|serve|thumbnail|publish|init|doctor|jobs> [options]',
+    'Usage: slidock <create|dev|build|preview|check|serve|thumbnail|publish|init|doctor|jobs> [options]',
     '',
     'Commands:',
+    '  create      Scaffold a local Slidev project without overwriting files',
+    '  dev         Run the local project development server',
     '  build       Build the configured Hub site',
+    '  preview     Preview the configured build output',
     '  check       Validate Hub config and report effective paths',
     '  serve       Serve a built site (default: ./dist, port 4174)',
     '  thumbnail   Generate thumbnails for a built site',
@@ -586,6 +704,10 @@ export async function runHub(
 ): Promise<void> {
   if (command === undefined) {
     emitSuccess('hub', { help: hubHelp() }, args.includes('--json'), hubHelp());
+    return;
+  }
+  if (command === 'create' || command === 'dev' || command === 'preview') {
+    await runProjectCli([command, ...args], cwd);
     return;
   }
   if (command === 'jobs') {

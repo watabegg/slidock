@@ -12,14 +12,14 @@ export function useCatalog(source?: MaybeRefOrGetter<CatalogSource | undefined>)
   let generation = 0;
   let disposed = false;
 
-  async function reload(): Promise<void> {
+  async function load(preserveCatalog = false): Promise<void> {
     if (disposed) return;
     const current = ++generation;
     controller?.abort();
     controller = new AbortController();
     pending.value = true;
     error.value = null;
-    catalog.value = null;
+    if (!preserveCatalog) catalog.value = null;
     try {
       const result = await getCatalog(toValue(source), { signal: controller.signal });
       if (current === generation) catalog.value = result;
@@ -30,7 +30,12 @@ export function useCatalog(source?: MaybeRefOrGetter<CatalogSource | undefined>)
     }
   }
 
+  const reload = () => load();
+  const catalogChanged = () => {
+    if (toValue(source) === undefined) void load(true);
+  };
   onMounted(() => {
+    window.addEventListener('slidock:catalog-update', catalogChanged);
     watch(
       () => toValue(source),
       () => {
@@ -40,6 +45,8 @@ export function useCatalog(source?: MaybeRefOrGetter<CatalogSource | undefined>)
     );
   });
   onScopeDispose(() => {
+    if (typeof window !== 'undefined')
+      window.removeEventListener('slidock:catalog-update', catalogChanged);
     disposed = true;
     generation++;
     controller?.abort();

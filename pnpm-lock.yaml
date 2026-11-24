@@ -415,7 +415,7 @@ importers:
       '@slidock/slidev-adapter':
         specifier: workspace:*
         version: link:../slidev-adapter
-      playwright-chromium:
+      playwright-core:
         specifier: 1.63.0
         version: 1.63.0
       vue:

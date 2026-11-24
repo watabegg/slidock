@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-16",
+  "scope": "Native bridge layout zoom for presenter, audience and preview frames",
+  "checks": {
+    "desktopBuild": "passed",
+    "linuxNative": {
+      "passed": true,
+      "assertions": 35,
+      "sourceRestored": true
+    },
+    "rendering": {
+      "passed": true,
+      "engines": [
+        "Playwright WebKit",
+        "Chromium"
+      ],
+      "viewportSizes": [
+        "1920x1080",
+        "800x550",
+        "288x162",
+        "1080x1080"
+      ],
+      "coverage": [
+        "fit scale and centered bounds",
+        "same document after navigation",
+        "fade CSS retained",
+        "ordinary Web retains original transform"
+      ]
+    },
+    "persistentFrames": "passed",
+    "pnpmCheck": "passed"
+  },
+  "evidence": [
+    "artifacts/slive-sharpness/build.log",
+    "artifacts/slive-sharpness/native-result.json",
+    "artifacts/slive-sharpness/rendering.json",
+    "artifacts/slive-sharpness/flicker.log",
+    "artifacts/slive-sharpness/check.log"
+  ],
+  "limitations": [
+    "Transient blur was not reliably reproduced in automated captures; improvement needs confirmation in the reporting environment.",
+    "macOS, Windows and physical external displays not tested.",
+    "Published remote decks require rebuilding their bridge; local decks require restarting the updated Slive binary."
+  ],
+  "rationaleSource": "https://bugs.webkit.org/show_bug.cgi?id=27684",
+  "reproduceRendering": "After building the offline module graph fixture and Slive UI, run node packages/slidock/scripts/verify-native-rendering.mjs from the repository root (Playwright WebKit and Chromium required)."
+}

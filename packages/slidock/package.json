@@ -1,12 +1,11 @@
 {
   "name": "@slidock/slidock",
-  "private": true,
   "type": "module",
   "scripts": {
     "typecheck": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.client.json",
     "build": "pnpm --filter @slidock/protocol build && pnpm --filter @slidock/slidev-adapter build && pnpm build:node && pnpm build:client && node scripts/build.mjs",
     "serve": "node scripts/serve.mjs artifacts/module-graph-offline/site 4174",
-    "test": "node --test scripts/fingerprint-offline.test.mjs scripts/native-player.test.mjs tests/catalog.test.mjs tests/runtime-environment.test.mjs tests/service.test.mjs tests/client.test.mjs",
+    "test": "node --test scripts/fingerprint-offline.test.mjs scripts/native-player.test.mjs tests/*.test.mjs",
     "verify:library": "node scripts/verify-library.mjs artifacts/module-graph-offline/site",
     "thumbnails": "node scripts/thumbnails.mjs artifacts/module-graph-offline/site",
     "build:node": "tsc -p tsconfig.node.json",
@@ -17,8 +16,8 @@
     "@slidock/slidev-adapter": "workspace:*",
     "@slidev/cli": "53.0.0",
     "@slidev/theme-default": "0.25.0",
-    "playwright-chromium": "1.63.0",
-    "vue": "3.5.43"
+    "vue": "3.5.43",
+    "playwright-core": "1.63.0"
   },
   "exports": {
     ".": {
@@ -40,7 +39,12 @@
     "./frontend": "./src/frontend/index.ts",
     "./frontend/style.css": "./src/frontend/style.css",
     "./frontend/job-status.css": "./src/frontend/job-status.css",
-    "./icon.svg": "./src/frontend/assets/slidock.svg"
+    "./icon.svg": "./src/frontend/assets/slidock.svg",
+    "./cli": {
+      "types": "./dist/node/project-cli.d.ts",
+      "import": "./dist/node/project-cli.js"
+    },
+    "./frontend/site.css": "./src/frontend/site.css"
   },
   "version": "0.1.0",
   "files": [
@@ -49,5 +53,18 @@
   ],
   "engines": {
     "node": ">=24.22.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/watabegg/slidock.git",
+    "directory": "packages/slidock"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "description": "Shared Slidev bundles and customizable multi-viewer Web APIs",
+  "bin": {
+    "slidock": "dist/node/bin/slidock.js"
   }
 }

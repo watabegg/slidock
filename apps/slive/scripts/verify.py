@@ -59,12 +59,16 @@ finally:
             process.kill()
             process.wait(timeout=5)
 
+startup = next((json.loads(line.removeprefix('STARTUP_WINDOWS '))
+                for line in args.log.read_text(errors='replace').splitlines()
+                if line.startswith('STARTUP_WINDOWS ')), None)
+startup_ok = startup == {'presenterVisible': True, 'audienceVisible': False}
 unchanged = all(source.read_bytes() == before for source, before in original.items())
-result = {'qa': qa, 'error': error, 'sourceRestored': unchanged, 'sourceSHA256': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}, 'log': str(args.log)}
+result = {'startupWindows': startup, 'startupPassed': startup_ok, 'qa': qa, 'error': error, 'sourceRestored': unchanged, 'sourceSHA256': {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}, 'log': str(args.log)}
 if (args.config.parent / 'notes-before.md').exists() and (args.config.parent / 'notes-after.md').exists():
     with (root / 'artifacts/notes-save.diff').open('w') as diff:
         subprocess.run(['git', 'diff', '--no-index', str(args.config.parent / 'notes-before.md'), str(args.config.parent / 'notes-after.md')], stdout=diff, check=False)
 args.log.with_suffix('.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
 print(json.dumps(result, ensure_ascii=False, indent=2))
-passed = qa is not None and qa.get('complete') is True and all(item['pass'] for item in qa.get('assertions', [])) and unchanged
+passed = startup_ok and qa is not None and qa.get('complete') is True and all(item['pass'] for item in qa.get('assertions', [])) and unchanged
 raise SystemExit(0 if passed else 1)

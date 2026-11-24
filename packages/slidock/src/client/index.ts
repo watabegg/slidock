@@ -1,5 +1,11 @@
 import { validateCatalog } from '@slidock/protocol/contracts';
 import type { Catalog, CatalogCategory, CatalogDeck } from '@slidock/protocol/contracts';
+import { getSiteBasePath } from './site-base.js';
+
+export { getSiteBasePath } from './site-base.js';
+
+export { selectCatalogDecks } from './catalog-view.js';
+export type { CatalogDeckSort, SelectCatalogDecksOptions } from './catalog-view.js';
 
 export type {
   Catalog,
@@ -95,7 +101,9 @@ export function createHttpCatalogSource(options: HttpCatalogSourceOptions = {}):
 
       try {
         const fetcher = options.fetch ?? globalThis.fetch;
-        const response = await fetcher(options.url ?? '/catalog.json', { signal });
+        const response = await fetcher(options.url ?? `${getSiteBasePath()}catalog.json`, {
+          signal,
+        });
         if (!response.ok) {
           throw new CatalogClientError(
             'HTTP',
@@ -152,7 +160,7 @@ function urlWithCursor(endpoint: string, cursor: string): string {
 export function createPaginatedCatalogSource(
   options: PaginatedCatalogSourceOptions = {},
 ): CatalogSource {
-  const endpoint = options.url ?? '/catalog.json';
+  const endpoint = options.url ?? `${getSiteBasePath()}catalog.json`;
   const maxPages = options.maxPages ?? 100;
   if (!Number.isSafeInteger(maxPages) || maxPages < 1)
     throw new RangeError('maxPages must be a positive safe integer');

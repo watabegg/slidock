@@ -7,7 +7,7 @@
     "typecheck": "pnpm build:packages && pnpm --filter @slidock/protocol typecheck && pnpm --filter @slidock/slidock typecheck && pnpm --filter @slidock/slive typecheck && pnpm --filter @slidock/workers typecheck && pnpm --filter @slidock/slidev-adapter typecheck && pnpm --filter @slidock/slive-tools typecheck && pnpm --filter @slidock/cli typecheck && pnpm --filter @slidock/server typecheck && pnpm --filter @slidock/adapter-cloudflare typecheck && pnpm --filter @slidock/adapter-node typecheck && pnpm --filter @slidock/storage-s3 typecheck && pnpm --filter @slidock/storage-gcs typecheck && pnpm --filter @slidock/state-postgres typecheck && pnpm --filter @slidock/server-app typecheck && pnpm --filter @slidock/renderer-playwright typecheck && vue-tsc --noEmit -p examples/custom-frontend/tsconfig.json",
     "test": "pnpm build:packages && node --test scripts/*.test.mjs && pnpm --filter @slidock/slidock test && pnpm --filter @slidock/slive test && pnpm --filter @slidock/workers test && pnpm --filter @slidock/protocol test && pnpm --filter @slidock/slidev-adapter test && pnpm --filter @slidock/slive-tools test && pnpm --filter @slidock/cli test && pnpm --filter @slidock/server test && pnpm --filter @slidock/adapter-cloudflare test && pnpm --filter @slidock/adapter-node test && pnpm --filter @slidock/storage-s3 test && pnpm --filter @slidock/storage-gcs test && pnpm --filter @slidock/state-postgres test && pnpm --filter @slidock/server-app test && pnpm --filter @slidock/renderer-playwright test",
     "build:slidock": "pnpm build:packages && node scripts/build-official-themes.mjs",
-    "dev:slidock": "node packages/slidock/scripts/serve.mjs packages/slidock/artifacts/official-themes/site 4174",
+    "dev:slidock": "pnpm build:packages && node scripts/dev-official-themes.mjs",
     "build:slive-ui": "pnpm --filter @slidock/slive build:ui",
     "slive:prepare": "pnpm build:packages && node apps/slive/scripts/prepare.mjs",
     "slive": "bash apps/slive/scripts/run.sh",
@@ -50,7 +50,13 @@
     "build:icons": "node scripts/build-brand-icons.mjs",
     "build:slidock:fixtures": "pnpm --filter @slidock/slidock build",
     "verify:slidock:fixtures": "pnpm --filter @slidock/slidock verify:library",
-    "verify:vue-frontend": "node scripts/verify-vue-frontend.mjs"
+    "verify:vue-frontend": "node scripts/verify-vue-frontend.mjs",
+    "preview:slidock": "node packages/slidock/scripts/serve.mjs packages/slidock/artifacts/official-themes/site 4174",
+    "verify:slidock:dev": "node scripts/verify-dev-server.mjs",
+    "pack:framework": "pnpm build:packages && node scripts/pack-framework.mjs",
+    "verify:packed-framework": "pnpm build:packages && node scripts/verify-packed-framework.mjs",
+    "verify:framework-frontend": "pnpm build:packages && node scripts/verify-framework-frontend.mjs",
+    "verify:pages": "node scripts/verify-pages-subpath.mjs && node scripts/verify-pages-dev.mjs"
   },
   "devDependencies": {
     "@slidev/cli": "53.0.0",
@@ -79,5 +85,6 @@
   "version": "0.1.0",
   "engines": {
     "node": ">=24.22.1"
-  }
+  },
+  "license": "MIT"
 }

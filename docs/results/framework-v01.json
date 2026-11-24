@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-19",
+  "baseCommit": "d685290ca20d41da85ed1e4fe25e407f8ad4b1a6",
+  "scope": "Slidock framework phases 1–4: npm distribution, project lifecycle CLI, collection management, and customizable Vue/client APIs.",
+  "environment": {
+    "platform": "linux",
+    "architecture": "x64",
+    "node": "v24.15.0"
+  },
+  "license": "MIT",
+  "checks": {
+    "pnpm check": {
+      "exitCode": 0,
+      "tests": 399,
+      "pass": 390,
+      "fail": 0,
+      "skipped": 9,
+      "skipReason": "PostgreSQL integration tests require HUB_TEST_DATABASE_URL.",
+      "boundaryViolations": 0,
+      "migrationExceptions": 0,
+      "log": "artifacts/framework-v01/check.log"
+    },
+    "developmentBrowser": {
+      "command": "CHROMIUM_EXECUTABLE=/usr/bin/google-chrome node scripts/verify-dev-server.mjs",
+      "exitCode": 0,
+      "checks": 14,
+      "pageErrors": [],
+      "log": "artifacts/framework-v01/dev-verification.log",
+      "result": "artifacts/hot-reload/results.json"
+    },
+    "sharedBundleBrowser": {
+      "command": "node artifacts/framework-v01/verify-groups.mjs",
+      "exitCode": 0,
+      "decks": 3,
+      "groups": 2,
+      "sharedJavaScriptRequestsBetweenCompatibleDecks": 20,
+      "differentThemeIsolated": true,
+      "pageErrors": [],
+      "result": "artifacts/framework-v01/groups/result.json"
+    },
+    "frontendBrowser": {
+      "command": "node scripts/verify-framework-frontend.mjs",
+      "exitCode": 0,
+      "coverage": [
+        "Home configuration and metadata",
+        "Search, filters and global sorting",
+        "Custom slots and controls",
+        "Host CSS isolation",
+        "Catalog refresh and empty states"
+      ],
+      "log": "artifacts/framework-v01/frontend-verification.log"
+    },
+    "legacyPackedCli": {
+      "command": "CHROMIUM_EXECUTABLE=/usr/bin/google-chrome node scripts/verify-packed-cli.mjs",
+      "exitCode": 0,
+      "log": "artifacts/framework-v01/packed-cli.log",
+      "timing": "Passed before the final grouping and development-cache fixes; not a whole-tree final regression."
+    },
+    "packedFramework": {
+      "command": "CHROMIUM_EXECUTABLE=/usr/bin/google-chrome node scripts/verify-packed-framework.mjs --reuse-packed",
+      "exitCode": 0,
+      "artifactVersion": "0.1.0-alpha.1",
+      "releaseSetHash": "8d560b20da39feeaef606bb9195f9706d41d8ce8d30785008209c79a5946a365",
+      "artifactPreparation": "Fresh artifacts built by pnpm verify:packed-framework; final rerun reused and verified their hashes after correcting verification-only assertions and a Playwright URL argument.",
+      "npmVersion": "11.12.1",
+      "pnpmVersion": "12.3.4",
+      "registry": "ephemeral @slidock scope registry; npmjs.org for all other packages",
+      "directConsumerDependencies": [
+        "@slidock/slidock"
+      ],
+      "consumerOverrides": false,
+      "repositoryLinks": false,
+      "lifecycles": {
+        "npm": {
+          "status": "passed",
+          "commands": [
+            "create",
+            "check",
+            "build",
+            "preview",
+            "dev"
+          ],
+          "deckCount": 2,
+          "compatibilityGroups": 1,
+          "sharedJavaScriptRequests": 20,
+          "changes": [
+            "initial",
+            "add",
+            "remove",
+            "empty",
+            "recovery"
+          ]
+        },
+        "pnpm": {
+          "status": "passed",
+          "commands": [
+            "create",
+            "check",
+            "build",
+            "preview",
+            "dev"
+          ],
+          "deckCount": 2,
+          "compatibilityGroups": 1,
+          "sharedJavaScriptRequests": 20,
+          "changes": [
+            "initial",
+            "add",
+            "remove",
+            "empty",
+            "recovery"
+          ]
+        }
+      },
+      "frontendSourceConsumer": {
+        "typecheckExitCode": 0,
+        "buildExitCode": 0,
+        "toolVersions": {
+          "@slidock/slidock": "0.1.0-alpha.1",
+          "@vitejs/plugin-vue": "6.0.10",
+          "vite": "8.3.3",
+          "vue": "3.5.43",
+          "vue-tsc": "3.3.12",
+          "typescript": "6.0.3"
+        }
+      },
+      "report": "artifacts/framework-v01/consumer/8d560b20da39feeaef606bb9195f9706d41d8ce8d30785008209c79a5946a365/verification-report.json",
+      "log": "artifacts/framework-v01/packed-framework.log"
+    }
+  },
+  "limitations": [
+    "The base commit plus uncommitted changes was tested; baseCommit alone does not identify the tested source snapshot.",
+    "The public npm registry was not modified. Public scope ownership and publication remain separate tasks.",
+    "macOS, Windows, non-root base paths, live cloud environments and native Slive acceptance were not tested in this change.",
+    "The full portable/container and native regression sequence was not rerun.",
+    "Skipped PostgreSQL checks are not counted as successes."
+  ]
+}

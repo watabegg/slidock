@@ -37,12 +37,41 @@ type NativeQaElementMap = {
       await until(() => cover.complete && cover.naturalWidth > 0);
       check(
         'library loads thumbnails and frontmatter',
-        document.querySelector('.deck-info h2')!.textContent!.includes('AAA 1'),
+        document.querySelector('.deck-info h3')!.textContent!.includes('AAA 1'),
+      );
+      check(
+        'library groups decks by category',
+        [...document.querySelectorAll('.library-category > h2')]
+          .map((heading) => heading.textContent)
+          .join(',') === 'aaa,bbb',
+      );
+      check(
+        'library hides redundant toolbar',
+        getComputedStyle(document.getElementById('presenter-header')!).display === 'none',
       );
       await sleep(16000);
       check(
         'idle library does not start hidden slide loads',
         poc.frames.stats.documentLoads === 0 && !document.getElementById('status')!.textContent,
+      );
+      check(
+        'home gives the Slive icon a dedicated place',
+        document.querySelector<HTMLImageElement>('.library-brand img')!.getBoundingClientRect()
+          .width >= 100,
+      );
+      const categoryButtons = [
+        ...document.querySelectorAll<HTMLButtonElement>('#library-categories button'),
+      ];
+      categoryButtons.find((button) => button.textContent === 'bbb')!.click();
+      check(
+        'sidebar selects a category',
+        document.querySelectorAll('.deck-card').length === 2 &&
+          document.querySelector('.library-category > h2')!.textContent === 'bbb',
+      );
+      categoryButtons[0]!.click();
+      check(
+        'sidebar restores all categories',
+        document.querySelectorAll('.deck-card').length === 4,
       );
       await poc.invoke('capture', { label: 'presenter', name: 'library' });
       const search = document.getElementById('library-search') as HTMLInputElement;
@@ -52,9 +81,57 @@ type NativeQaElementMap = {
       search.value = '';
       search.dispatchEvent(new Event('input'));
     }
+    if (!snapshot.sourceOrigin) {
+      const beforeSettings = await poc.invoke('settings_get');
+      document.querySelector<HTMLButtonElement>('#library [data-open-settings]')!.click();
+      const settingsDialog = document.getElementById('settings-dialog') as HTMLDialogElement;
+      await until(() => settingsDialog.open);
+      document.querySelector<HTMLButtonElement>('[data-theme-choice=dark]')!.click();
+      await until(() => document.documentElement.dataset.theme === 'dark');
+      check('dark appearance persists', (await poc.invoke('settings_get')).theme === 'dark');
+      await poc.invoke('capture', { label: 'presenter', name: 'settings-dark' });
+      document.querySelector<HTMLButtonElement>('[data-theme-choice=light]')!.click();
+      await until(() => document.documentElement.dataset.theme === 'light');
+      await poc.invoke('capture', { label: 'presenter', name: 'settings-light' });
+      document.getElementById('settings-close')!.click();
+      let rejected = false;
+      try {
+        await poc.invoke('settings_connect', {
+          connection: 'web',
+          url: 'https://example.com/not-a-root',
+        });
+      } catch {
+        rejected = true;
+      }
+      check(
+        'invalid connection retains current settings',
+        rejected && (await poc.invoke('settings_get')).connection === beforeSettings.connection,
+      );
+      await poc.invoke('settings_connect', { connection: 'web', url: snapshot.viewerOrigin });
+      const connected = await poc.invoke('settings_get');
+      check(
+        'Slidock connection is validated and saved',
+        connected.connection === 'web' && connected.url === snapshot.viewerOrigin,
+      );
+      await poc.invoke('settings_connect', { connection: 'local', url: '' });
+      check(
+        'local connection can be restored',
+        (await poc.invoke('settings_get')).connection === 'local',
+      );
+      await poc.invoke('settings_theme', { theme: beforeSettings.theme });
+    }
     document.querySelector<HTMLButtonElement>('.deck-card')!.click();
     await until(() => !document.body.classList.contains('library-open'));
     check('card opens presenter without deck select', !document.getElementById('decks'));
+    const selectedDeck = poc.getState().deckId;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true }));
+    check('back shortcut returns to library', document.body.classList.contains('library-open'));
+    check(
+      'back restores selected card focus',
+      (document.activeElement as HTMLElement)?.dataset.deckId === selectedDeck,
+    );
+    (document.activeElement as HTMLButtonElement).click();
+    await until(() => !document.body.classList.contains('library-open'));
 
     const rendered = async (): Promise<NativeRenderedReport> => {
       const state = poc.getState();
@@ -546,6 +623,12 @@ type NativeQaElementMap = {
       },
     });
   } catch (error) {
-    await report({ complete: false, error: String(error), assertions });
+    await report({
+      complete: false,
+      error: String(error),
+      status: document.getElementById('status')?.textContent,
+      frameStats: window.__nativePoc?.frames.stats,
+      assertions,
+    });
   }
 })();

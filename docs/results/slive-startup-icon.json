@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-21",
+  "scope": "Slive initial projection visibility and native icon tile",
+  "status": "passed",
+  "changes": [
+    "Audience window is prepared hidden and shown by explicit projection operation.",
+    "Native PNG/ICO/ICNS icons have a white rounded background; in-app SVG is unchanged."
+  ],
+  "checks": {
+    "desktopBuild": "passed",
+    "iconGeneration": "passed",
+    "iconVisualInspection": "passed",
+    "linuxLauncher": "updated and icon cache refreshed",
+    "nativeStartup": {
+      "audienceVisible": false,
+      "presenterVisible": true
+    },
+    "nativeQa": {
+      "passed": true,
+      "assertions": 35,
+      "sourceRestored": true,
+      "environment": "Linux native WebKit, isolated D-Bus session; physical display placement not verified"
+    },
+    "pnpmCheck": {
+      "status": "passed",
+      "tests": 410,
+      "pass": 401,
+      "fail": 0,
+      "skipped": 9
+    },
+    "rustFormat": "passed"
+  },
+  "limitations": [
+    "Windows/macOS launcher appearance and physical external display placement were not verified."
+  ],
+  "evidence": [
+    "artifacts/slive-startup/desktop-build.log",
+    "artifacts/slive-startup/native-qa.json",
+    "artifacts/slive-startup/check.log"
+  ]
+}

@@ -1,7 +1,6 @@
 {
   "name": "@slidock/slidev-adapter",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "exports": {
     "./clicks": {
@@ -23,6 +22,10 @@
     "./static-runtime": {
       "types": "./dist/static-runtime.d.ts",
       "import": "./dist/static-runtime.js"
+    },
+    "./dev-runtime": {
+      "types": "./dist/dev-runtime.d.ts",
+      "import": "./dist/dev-runtime.js"
     }
   },
   "scripts": {
@@ -38,5 +41,14 @@
   ],
   "engines": {
     "node": ">=24.22.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/watabegg/slidock.git",
+    "directory": "packages/slidev-adapter"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

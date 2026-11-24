@@ -4,6 +4,8 @@ Slidev の発表者用画面と聴講者用画面の 2 画面を提供する、R
 
 本プロジェクトは現在開発中であり、ソースコードは公開されていますが、npm やネイティブパッケージとしての配布、およびライセンスの選定は完了していません。また、Windows 環境での動作や物理 2 画面での動作は未検証です。設計上の判断理由については [DECISIONS.md](../../docs/DECISIONS.md) を参照してください。
 
+起動時は発表者のホーム画面だけを表示します。資料を開き、「投影先の設定」で「適用」を押すと投影画面が表示されます。
+
 ## 主な機能と仕様
 
 仕様の詳細に関する重複した説明を避け、各機能の解説は `../../docs/guides/` 配下の各ガイドに集約しています。
@@ -67,3 +69,7 @@ pnpm verify:workers-slive && pnpm verify:slive
 ```bash
 CARGO_BUILD_JOBS=2 cargo test --locked --manifest-path apps/slive/Cargo.toml -p slive-core -p slive
 ```
+
+### Linux のアプリ一覧に登録
+
+デスクトップ版をビルドした後、`node apps/slive/scripts/install-desktop.mjs` をリポジトリ直下から実行すると、現在のユーザーのアプリ一覧に Slive を登録します。設定ファイルを変える場合は第1引数にパスを指定します。登録したランチャーは、このチェックアウトの開発用バイナリを起動します。

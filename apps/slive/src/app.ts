@@ -1,3 +1,4 @@
+import { mountSettings } from './settings';
 import { mountLibrary } from './library';
 import { installIcons, setIcon } from './icons';
 
@@ -44,11 +45,14 @@ type NativeAppElementMap = {
   let notesMode: 'markdown' | 'sidecar' = 'markdown';
   let homeOpen = role === 'presenter';
   const titles = new Map<string, string>();
+  const settings = mountSettings(() => notesDirty || drafts.size > 0);
   function showHome(open: boolean): void {
     homeOpen = open;
     document.body.classList.toggle('library-open', open);
     el('library').hidden = !open;
-    el('deck-title').textContent = open ? 'Slive' : titles.get(state!.deckId) || state!.deckId;
+    el('home-button').hidden = open;
+    document.getElementById('display-settings')?.removeAttribute('open');
+    el('deck-title').textContent = open ? '' : titles.get(state!.deckId) || state!.deckId;
     if (!open && state) {
       frames?.update(state);
       if (state.page < deckFor(state.deckId).clickTotals.length)
@@ -180,6 +184,10 @@ type NativeAppElementMap = {
     }
   }
 
+  function exitAudienceFullscreen(): void {
+    if (role === 'audience') invoke('audience_exit_fullscreen').catch(console.error);
+  }
+
   const initial = await invoke('snapshot');
   registry = initial.decks;
   viewerOrigin = initial.viewerOrigin;
@@ -188,7 +196,10 @@ type NativeAppElementMap = {
   frames = new window.NativeFrameController(el('deck'), {
     origin: viewerOrigin,
     decks: registry,
-    onInput: (kind) => action(kind),
+    onEscape: exitAudienceFullscreen,
+    onInput: (kind) => {
+      if (!settings.open()) void action(kind);
+    },
     onRendered: (report, origin) => {
       rendered.set(report.url, report);
       invoke('viewer_ready', { report: { ...report, origin } }).catch(console.error);
@@ -233,11 +244,26 @@ type NativeAppElementMap = {
       return;
     }
     showHome(true);
-    (document.getElementById('library-search') as HTMLInputElement).focus();
+    const selected = [...document.querySelectorAll<HTMLButtonElement>('.deck-card')].find(
+      (card) => card.dataset.deckId === state?.deckId,
+    );
+    (selected ?? document.getElementById('library-search'))?.focus();
   };
   window.addEventListener(
     'keydown',
     (event) => {
+      if (role === 'audience' && event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!event.repeat) exitAudienceFullscreen();
+        return;
+      }
+      if (settings.open()) return;
+      if (!homeOpen && event.altKey && event.key === 'ArrowLeft' && !event.repeat) {
+        event.preventDefault();
+        el('home-button').click();
+        return;
+      }
       if (
         homeOpen ||
         (event.target instanceof Element &&

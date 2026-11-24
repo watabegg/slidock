@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-19",
+  "baseCommit": "f102220",
+  "scope": "Documentation and archive organization around Slidock as a shared-bundle and Web frontend API framework; existing uncommitted implementation preserved.",
+  "changes": [
+    "Clarified framework, examples, development server and static build entrypoints.",
+    "Moved completed publication-job plan, task ledger and approved mock to docs/archive/publication-jobs; retained content and adjusted relative links.",
+    "Restricted TODO.md to open tasks and indexed historical verification records."
+  ],
+  "checks": {
+    "pnpm check": {
+      "exitCode": 0,
+      "counts": {
+        "tests": 363,
+        "pass": 354,
+        "fail": 0,
+        "skipped": 9
+      },
+      "log": "artifacts/repo-cleanup/pnpm-check.log"
+    },
+    "localLinks": {
+      "checked": 90,
+      "missing": 0
+    },
+    "archiveContent": "Plan preserved except relative image paths; approved mock byte-identical.",
+    "localhost": "HTTP 200 from http://127.0.0.1:4174/",
+    "git diff --check": "passed"
+  },
+  "limitations": [
+    "pnpm check applies to the local worktree including existing uncommitted implementation; baseCommit alone does not identify that source snapshot.",
+    "Skipped tests remain skipped; see check log for prerequisites.",
+    "Portable container, packed CLI, native acceptance and cloud deployment were not rerun.",
+    "Existing implementation changes remain uncommitted.",
+    "agy-writer unavailable due to Gemini individual quota; documentation corrections performed directly."
+  ],
+  "evidence": [
+    "artifacts/repo-cleanup/before.json",
+    "artifacts/repo-cleanup/links.json"
+  ]
+}

@@ -21,10 +21,12 @@ for (const dependencyRoot of dependencyRoots) {
     const envFile = join(runtime.clientRoot, 'env.ts');
     const mainFile = join(runtime.clientRoot, 'setup/main.ts');
     const rootFile = join(runtime.clientRoot, 'setup/root.ts');
-    const [envSource, mainSource, rootSource] = await Promise.all([
+    const preloadImagesFile = join(runtime.clientRoot, 'composables/usePreloadImages.ts');
+    const [envSource, mainSource, rootSource, preloadImagesSource] = await Promise.all([
       readFile(envFile, 'utf8'),
       readFile(mainFile, 'utf8'),
       readFile(rootFile, 'utf8'),
+      readFile(preloadImagesFile, 'utf8'),
     ]);
 
     const env = patchStaticRuntimeModule({
@@ -42,6 +44,11 @@ for (const dependencyRoot of dependencyRoots) {
       id: rootFile,
       clientRoot: runtime.clientRoot,
     });
+    const preloadImages = patchStaticRuntimeModule({
+      code: preloadImagesSource,
+      id: preloadImagesFile,
+      clientRoot: runtime.clientRoot,
+    });
     assert.ok(env.includes("import { deckBase as __labDeckBase } from '/@lab/selection';"));
     assert.ok(!env.includes('import.meta.env.BASE_URL'));
     assert.ok(
@@ -49,6 +56,9 @@ for (const dependencyRoot of dependencyRoots) {
     );
     assert.ok(root.includes('`${__labDeckId} - shared`'));
     assert.ok(root.includes('`${__labDeckId} - drawings`'));
+    assert.ok(preloadImages.includes('siteBase as __labSiteBase'));
+    assert.ok(preloadImages.includes('url.startsWith(__labSiteBase)'));
+    assert.ok(!preloadImages.includes('import.meta.env.BASE_URL'));
   });
 }
 

@@ -77,6 +77,12 @@ function isNativeMessageRecord(value: unknown): value is Record<string, unknown>
   window.addEventListener(
     'keydown',
     (event) => {
+      if (event.key === 'Escape' && !event.repeat) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!preview) post({ nativeEscape: true, documentToken });
+        return;
+      }
       const kind = actionFor(event.key);
       // Native owns navigation even if a theme binds an extra key. Ordinary text
       // keeps its browser default, while later theme shortcut listeners are quiet.
@@ -321,7 +327,26 @@ function isNativeMessageRecord(value: unknown): value is Record<string, unknown>
   });
   async function start(): Promise<void> {
     const style = document.createElement('style');
-    style.textContent = '#app nav{display:none!important}';
+    // WebKit can rasterize fading layers before their ancestor transform scale
+    // is applied. Layout zoom gives those layers their final drawing scale.
+    style.textContent = `
+      #app nav { display: none !important; }
+      @supports (zoom: 1) {
+        #slide-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        #slide-content {
+          position: relative;
+          left: auto;
+          top: auto;
+          transform: none;
+          zoom: var(--slidev-slide-scale);
+          flex: none;
+        }
+      }
+    `;
     document.head.append(style);
     const deadline = performance.now() + 12000;
     while (!runtime()?.router || !runtime()?.slides) {

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue';
-import type { Catalog, CatalogCategory, CatalogDeck } from '@slidock/slidock/client';
+import { getSiteBasePath, selectCatalogDecks } from '@slidock/slidock/client';
+import type { Catalog, CatalogCategory, CatalogDeck, JsonValue } from '@slidock/slidock/client';
 import type { VNode } from 'vue';
+import type { CatalogDeckSort } from '@slidock/slidock/client';
 import SlideCard from './SlideCard.vue';
 import CategoryNav from './CategoryNav.vue';
 
@@ -13,12 +15,38 @@ const props = withDefaults(defineProps<{
   homeHref?: string;
   categoryLabels?: Record<string, string>;
   deckHref?: (deck: CatalogDeck) => string;
-}>(), { title: 'Slidock', homeHref: '/', logo: undefined });
+  controls?: boolean;
+}>(), { title: 'Slidock', logo: undefined, controls: true });
+const homeHref = computed(() => props.homeHref ?? getSiteBasePath());
 const selected = defineModel<string>('category', { default: '' });
+const query = defineModel<string>('query', { default: '' });
+const tag = defineModel<string>('tag', { default: '' });
+const sort = defineModel<CatalogDeckSort>('sort', { default: 'catalog' });
 const listId = `slidock-slides-${useId()}`;
 const categoryLabel = (id: string) => props.categoryLabels?.[id] ?? props.catalog.categories.find(category => category.id === id)?.name ?? id;
-const decks = computed(() => props.catalog.decks.filter(deck => !selected.value || deck.categoryPath.join('/') === selected.value || deck.categoryPath.join('/').startsWith(`${selected.value}/`)));
+const decks = computed(() => selectCatalogDecks(props.catalog.decks, {
+  query: query.value,
+  category: selected.value,
+  tag: tag.value,
+  sort: sort.value,
+}));
+const tagValues = (value: JsonValue | undefined): string[] => {
+  if (value === undefined || value === null || typeof value === 'boolean') return [];
+  if (typeof value === 'string' || typeof value === 'number') return [String(value)];
+  if (Array.isArray(value)) return value.flatMap(tagValues);
+  return Object.values(value).flatMap(tagValues);
+};
+const availableTags = computed(() => {
+  const values = new Set(props.catalog.decks.flatMap(deck => tagValues(deck.frontmatter.tags)));
+  if (tag.value) values.add(tag.value);
+  return Array.from(values).sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+});
 const groups = computed(() => {
+  if (sort.value !== 'catalog') {
+    return decks.value.length
+      ? [{ id: selected.value, label: selected.value ? categoryLabel(selected.value) : '資料', decks: decks.value }]
+      : [];
+  }
   const result = new Map<string, CatalogDeck[]>();
   for (const deck of decks.value) {
     const category = deck.categoryPath.join('/');
@@ -30,14 +58,27 @@ const groups = computed(() => {
 });
 const hrefFor = (deck: CatalogDeck) => props.deckHref?.(deck) ?? deck.entry;
 const selectCategory = (category: string) => { selected.value = category; };
+const setQuery = (value: string) => { query.value = value; };
+const setTag = (value: string) => { tag.value = value; };
+const setSort = (value: CatalogDeckSort) => { sort.value = value; };
 defineSlots<{
   brand?(props: { title: string; href: string }): VNode[];
   nav?(): VNode[];
   header?(): VNode[];
+  toolbar?(props: {
+    query: string;
+    tag: string;
+    sort: CatalogDeckSort;
+    category: string;
+    setQuery: (value: string) => void;
+    setTag: (value: string) => void;
+    setSort: (value: CatalogDeckSort) => void;
+    setCategory: (value: string) => void;
+  }): VNode[];
   sidebar?(props: { categories: CatalogCategory[]; selected: string; select: (category: string) => void }): VNode[];
   'category-heading'?(props: { id: string; label: string; decks: CatalogDeck[] }): VNode[];
   card?(props: { deck: CatalogDeck; href: string }): VNode[];
-  empty?(): VNode[];
+  empty?(props: { reason: 'catalog' | 'filters' }): VNode[];
   footer?(): VNode[];
 }>();
 </script>
@@ -72,6 +113,43 @@ defineSlots<{
         />
       </slot>
       <main class="library-main" aria-label="スライド一覧">
+        <div v-if="controls || $slots.toolbar" class="library-toolbar">
+          <slot
+            name="toolbar"
+            :query="query"
+            :tag="tag"
+            :sort="sort"
+            :category="selected"
+            :set-query="setQuery"
+            :set-tag="setTag"
+            :set-sort="setSort"
+            :set-category="selectCategory"
+          >
+            <div v-if="controls" class="catalog-controls">
+              <label class="filter-control">
+                <span>検索</span>
+                <input v-model="query" type="search" aria-label="資料を検索" autocomplete="off" />
+              </label>
+              <label class="filter-control">
+                <span>タグ</span>
+                <select v-model="tag" aria-label="タグで絞り込み">
+                  <option value="">すべてのタグ</option>
+                  <option v-for="value in availableTags" :key="value" :value="value">
+                    {{ value }}
+                  </option>
+                </select>
+              </label>
+              <label class="filter-control">
+                <span>並び順</span>
+                <select v-model="sort" aria-label="並び替え">
+                  <option value="catalog">登録順</option>
+                  <option value="title">タイトル順</option>
+                  <option value="date">日付順</option>
+                </select>
+              </label>
+            </div>
+          </slot>
+        </div>
         <div class="category-groups" aria-live="polite">
           <section
             v-for="group in groups"
@@ -100,7 +178,11 @@ defineSlots<{
           </section>
         </div>
         <template v-if="!decks.length">
-          <slot name="empty"><p class="empty-library">スライドがありません。</p></slot>
+          <slot name="empty" :reason="catalog.decks.length ? 'filters' : 'catalog'">
+            <p class="empty-library">
+              {{ catalog.decks.length ? '条件に一致するスライドがありません。' : 'スライドがありません。' }}
+            </p>
+          </slot>
         </template>
       </main>
     </div>

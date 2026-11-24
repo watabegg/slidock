@@ -1,6 +1,6 @@
 use serde::Serialize;
-use slive_core::{Controller, Deck, Input, NotesDocument, Session, SidecarNotes};
 use slive::config::ConfigWriteLock;
+use slive_core::{Controller, Deck, Input, NotesDocument, Session, SidecarNotes};
 use std::{collections::HashMap, fs, path::PathBuf, sync::Mutex};
 use tauri::{Emitter, Manager, WebviewWindow};
 
@@ -8,6 +8,7 @@ pub(crate) struct Runtime {
     controller: Mutex<Controller>,
     viewer_origin: String,
     pub(crate) config_path: PathBuf,
+    base_config_path: PathBuf,
     notes: Mutex<HashMap<String, NotesDocument>>,
     pub(crate) remote_origin: Option<String>,
     remote_notes: Mutex<Option<RemoteNotes>>,
@@ -23,6 +24,7 @@ impl Runtime {
         controller: Controller,
         viewer_origin: String,
         config_path: PathBuf,
+        base_config_path: PathBuf,
         notes: HashMap<String, NotesDocument>,
         remote_origin: Option<String>,
     ) -> Self {
@@ -30,6 +32,7 @@ impl Runtime {
             controller: Mutex::new(controller),
             viewer_origin,
             config_path,
+            base_config_path,
             notes: Mutex::new(notes),
             remote_origin,
             remote_notes: Mutex::new(None),
@@ -424,6 +427,14 @@ pub(crate) fn displays(window: WebviewWindow) -> Result<Vec<Display>, String> {
         .collect())
 }
 #[tauri::command]
+pub(crate) fn audience_exit_fullscreen(window: WebviewWindow) -> Result<(), String> {
+    if window.label() != "audience" {
+        return Err("audience command".into());
+    }
+    window.set_fullscreen(false).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub(crate) fn audience_display(
     window: WebviewWindow,
     app: tauri::AppHandle,
@@ -476,4 +487,77 @@ pub(crate) async fn catalog_page(
     })
     .await
     .map_err(|_| "catalog task failed".to_owned())?
+}
+
+#[tauri::command]
+pub(crate) fn settings_get(
+    window: WebviewWindow,
+    state: tauri::State<Runtime>,
+) -> Result<slive::preferences::View, String> {
+    require_window(&window)?;
+    let prefs = slive::preferences::load(&state.base_config_path)?;
+    slive::preferences::view(&state.base_config_path, &prefs)
+}
+#[tauri::command]
+pub(crate) fn settings_theme(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    state: tauri::State<Runtime>,
+    theme: slive::preferences::Theme,
+) -> Result<(), String> {
+    require_presenter(&window)?;
+    let base = &state.base_config_path;
+    let _lock = ConfigWriteLock::acquire(&slive::preferences::path(base))?;
+    let mut prefs = slive::preferences::load(base)?;
+    prefs.theme = theme;
+    slive::preferences::write_json(&slive::preferences::path(base), &prefs)?;
+    let native = match theme {
+        slive::preferences::Theme::Light => Some(tauri::Theme::Light),
+        slive::preferences::Theme::Dark => Some(tauri::Theme::Dark),
+        slive::preferences::Theme::System => None,
+    };
+    for window in app.webview_windows().values() {
+        window
+            .set_theme(native)
+            .map_err(|_| "外観を変更できませんでした")?;
+    }
+    app.emit("appearance", theme)
+        .map_err(|_| "外観を変更できませんでした")?;
+    Ok(())
+}
+#[tauri::command]
+pub(crate) async fn settings_connect(
+    window: WebviewWindow,
+    state: tauri::State<'_, Runtime>,
+    connection: String,
+    url: String,
+) -> Result<(), String> {
+    require_presenter(&window)?;
+    let base = state.base_config_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let remote = match connection.as_str() {
+            "local" => {
+                if !matches!(
+                    slive::config::load(&base)?.playback,
+                    slive::config::Playback::Local { .. }
+                ) {
+                    return Err("この起動設定にはローカル資料がありません".into());
+                }
+                None
+            }
+            "web" => Some(slive::preferences::fetch_remote(&url, &base)?),
+            _ => return Err("接続方法を選んでください".into()),
+        };
+        let _lock = ConfigWriteLock::acquire(&slive::preferences::path(&base))?;
+        let mut prefs = slive::preferences::load(&base)?;
+        prefs.remote = remote;
+        slive::preferences::write_json(&slive::preferences::path(&base), &prefs)
+    })
+    .await
+    .map_err(|_| "接続先を変更できませんでした")?
+}
+#[tauri::command]
+pub(crate) fn settings_restart(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
+    require_presenter(&window)?;
+    app.restart();
 }

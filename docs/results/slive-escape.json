@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-16",
+  "scope": "Escape exits audience fullscreen without changing slide state",
+  "checks": {
+    "pnpmCheck": "passed",
+    "cargoFmt": "passed",
+    "desktopBuild": "passed",
+    "browser": [
+      "WebKit and Chromium forward Escape from the focused slide iframe without changing page",
+      "controller rejects Escape from unknown origins, windows, stale documents and previews"
+    ],
+    "nativeRegression": {
+      "passed": true,
+      "assertions": 35,
+      "sourceRestored": true
+    }
+  },
+  "limitations": [
+    "Native regression exercises existing fullscreen commands, but does not physically press Escape or verify the OS fullscreen state afterward.",
+    "Old published bridges require rebuilding to forward Escape from inside slides."
+  ],
+  "evidence": [
+    "artifacts/slive-sharpness/escape-build.log",
+    "artifacts/slive-sharpness/escape-check.log",
+    "artifacts/slive-sharpness/escape-rendering.log",
+    "artifacts/slive-sharpness/escape-native-result.log"
+  ]
+}

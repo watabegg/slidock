@@ -168,7 +168,9 @@ test('hub defaults source and output paths from the caller working directory', a
     await writeFile(path.join(sourceRoot, 'default-course', 'slides.md'), '# Default\n');
     const result = run(hubBin, ['check', '--json'], cwd);
     assert.equal(result.status, 0, result.stderr);
-    const data = jsonOutput(result).data;
+    const envelope = jsonOutput(result);
+    assert.equal(envelope.command, 'slidock check');
+    const data = envelope.result;
     assert.equal(data.sourceRoot, sourceRoot);
     assert.equal(data.outDir, path.join(cwd, 'dist'));
     assert.deepEqual(data.deckIds, ['default-course']);

@@ -34,6 +34,20 @@ jobs:
       - run: pnpm verify:packed-server
       - run: pnpm verify:server
       - run: pnpm verify:publication-jobs
+  framework:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+      - run: npm install --global pnpm@12.3.4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm verify:packed-framework
+      - run: pnpm verify:framework-frontend
+      - run: pnpm verify:pages
   rust-core:
     needs: portable
     env:

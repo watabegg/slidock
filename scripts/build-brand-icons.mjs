@@ -6,6 +6,10 @@ const root = new URL('../', import.meta.url);
 const output = new URL('apps/slive/src-tauri/icons/', root);
 await mkdir(output, { recursive: true });
 const svg = await readFile(new URL('apps/slive/src/slive.svg', root), 'utf8');
+// Preserve the artwork; compensate for its upper-left visual weight at launcher sizes.
+const appIconSvg = svg
+  .replace('</defs>', '</defs><g transform="translate(64 64) scale(1.3) translate(-60 -60)">')
+  .replace('</svg>', '</g></svg>');
 const browser = await chromium.launch({ headless: true });
 const pngs = new Map();
 try {
@@ -13,7 +17,7 @@ try {
   for (const size of [16, 32, 48, 64, 128, 256, 512, 1024]) {
     await page.setViewportSize({ width: size, height: size });
     await page.setContent(
-      `<style>html,body{margin:0;background:transparent}svg{display:block;width:100vw;height:100vh}</style>${svg}`,
+      `<style>html,body{margin:0;background:transparent}svg{display:block;width:100vw;height:100vh}</style>${appIconSvg}`,
     );
     pngs.set(size, await page.screenshot({ omitBackground: true }));
   }

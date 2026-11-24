@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-16",
+  "scope": "Slive OS icon canvas",
+  "change": "144-unit canvas reduced to 120 units for generated OS icons; approved SVG unchanged",
+  "checks": {
+    "pnpmCheck": "passed",
+    "desktopBuild": "passed",
+    "pngVisualInspection": "passed",
+    "opaqueBounds512": {
+      "before": [
+        75,
+        86,
+        429,
+        426
+      ],
+      "after": [
+        39,
+        52,
+        464,
+        460
+      ]
+    },
+    "linuxLauncher": "installed and icon cache refreshed"
+  },
+  "limitations": [
+    "macOS and Windows appearance not tested",
+    "running windows need an app restart to receive the rebuilt embedded icon"
+  ],
+  "evidence": [
+    "artifacts/slive-sharpness/icon-build.log",
+    "artifacts/slive-sharpness/icon-check.log"
+  ]
+}

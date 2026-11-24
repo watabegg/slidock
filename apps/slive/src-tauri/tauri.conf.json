@@ -11,7 +11,8 @@
     "windows": [],
     "security": {
       "csp": null
-    }
+    },
+    "enableGTKAppId": true
   },
   "bundle": {
     "active": false,

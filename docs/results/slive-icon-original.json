@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-22",
+  "scope": "Restore original screen and bar geometry; transparent native icon at 1.15 scale",
+  "status": "passed",
+  "checks": {
+    "generation": "passed",
+    "visualInspection": "passed",
+    "launcher": "updated and icon cache refreshed",
+    "scopedLintFormat": "passed",
+    "desktopBuild": "passed",
+    "pnpmCheck": {
+      "status": "passed",
+      "tests": 410,
+      "pass": 401,
+      "fail": 0,
+      "skipped": 9,
+      "note": "Check began before the bar reversal; final generator also passed scoped lint/format and regenerated icons plus desktop build."
+    }
+  },
+  "limitations": [
+    "Windows/macOS icon appearance not verified"
+  ],
+  "evidence": [
+    "artifacts/slive-icon-original/build.log",
+    "artifacts/slive-icon-bar/check.log"
+  ]
+}

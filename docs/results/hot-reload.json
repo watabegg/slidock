@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-13",
+  "scope": "Local Slidev and Vue hot reload",
+  "baselinePushed": "f102220",
+  "qualityGates": {
+    "pnpm check": "passed",
+    "tests": {
+      "pass": 353,
+      "fail": 0,
+      "skipped": 9
+    },
+    "vueApiRegression": {
+      "checks": [
+        "A consumer Vue SFC imports public components/composable, customizes a card slot and navigates to a slide and back",
+        "All home/card slots render real Vue content, events work, and category v-model synchronizes in both directions",
+        "Reactive catalog updates replace cards with the caller-provided empty slot",
+        "useCatalog exposes loading/error/reload, watches source refs, rejects stale results, and aborts requests on unmount"
+      ],
+      "lifecycle": {
+        "loading": true,
+        "latestWins": true,
+        "failed": true,
+        "recovered": true,
+        "retried": true,
+        "unmounted": true
+      },
+      "browserErrors": []
+    },
+    "devBrowser": {
+      "checks": [
+        "Home and live thumbnails work without a static site build",
+        "Vue home edits hot-update without a document reload",
+        "Markdown hot-updates in place on page 2; home metadata and thumbnail revision update",
+        "Catalog refresh preserves category selection and regenerates changed cover pixels",
+        "Adding a slide updates the catalog and new deep link",
+        "Syntax errors show an overlay, a valid save recovers, and rapid saves converge on the latest content",
+        "Different themes and encoded deck paths work, with return navigation"
+      ],
+      "errors": []
+    },
+    "officialDemo": {
+      "url": "http://127.0.0.1:4174",
+      "cards": 5,
+      "liveThumbnails": 5,
+      "encodedThemeNavigation": true,
+      "polling": true,
+      "errors": []
+    },
+    "officialSourceHashesAndThemeVersions": "passed",
+    "finalLintFormatAndDiffCheck": "passed",
+    "thumbnailLayoutReady": "passed: waits for asynchronous layout before capture; all five official covers visually verified",
+    "pollingWatchers": "passed: 200ms polling avoids host inotify instance exhaustion"
+  },
+  "limitations": [
+    "Adding or removing deck entries and changing profile assignments requires restarting the dev server.",
+    "Changes to compiler configuration/features may restart the affected Slidev runtime and reload its page.",
+    "Development mode verified with Slidev 53.0.0 on Linux; Native and cloud deployment were not rerun."
+  ],
+  "evidence": [
+    "artifacts/hot-reload/",
+    "artifacts/vue-api/results.json"
+  ]
+}

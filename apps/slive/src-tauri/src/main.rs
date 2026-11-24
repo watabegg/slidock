@@ -1,12 +1,12 @@
 mod commands;
 
 use commands::Runtime;
-use slive_core::Controller;
 use slive::{
     auth_transport,
     config::{self, Playback},
     paths, server,
 };
+use slive_core::Controller;
 use std::{collections::HashMap, path::PathBuf};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -31,6 +31,10 @@ fn main() {
         cfg!(debug_assertions),
     )
     .expect("could not resolve Stage config path");
+    let base_config_path = config_path;
+    let preferences = slive::preferences::load(&base_config_path).expect("invalid Slive settings");
+    let config_path = slive::preferences::active_config(&base_config_path, &preferences)
+        .expect("invalid Slive connection");
     let loaded = config::load(&config_path).expect("invalid Stage config");
     let file_config = loaded.config;
     let controller = Controller::new(file_config.decks.clone()).expect("invalid deck bounds");
@@ -75,6 +79,7 @@ fn main() {
             controller,
             viewer_origin,
             config_path,
+            base_config_path,
             notes,
             remote_origin,
         ))
@@ -101,6 +106,10 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::settings_get,
+            commands::settings_theme,
+            commands::settings_connect,
+            commands::settings_restart,
             commands::snapshot,
             commands::catalog_page,
             commands::transition,
@@ -113,9 +122,10 @@ fn main() {
             commands::qa_reopen_notes,
             commands::qa_control_url,
             commands::displays,
+            commands::audience_exit_fullscreen,
             commands::audience_display
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let runtime = app.state::<Runtime>();
             if runtime.remote_origin.is_some() {
                 let directory = if std::env::var_os("NATIVE_POC_QA").is_some() {
@@ -128,20 +138,31 @@ fn main() {
                     .configure_remote_notes(directory)
                     .map_err(std::io::Error::other)?;
             }
+            let theme = match preferences.theme {
+                slive::preferences::Theme::Light => Some(tauri::Theme::Light),
+                slive::preferences::Theme::Dark => Some(tauri::Theme::Dark),
+                slive::preferences::Theme::System => None,
+            };
             let presenter = WebviewWindowBuilder::new(
                 app,
                 "presenter",
                 WebviewUrl::App("index.html?role=presenter".into()),
             )
-            .title("Slive · 発表者")
+            .title("Slive")
+            .icon(tauri::include_image!("icons/128x128@2x.png"))?
+            .theme(theme)
             .inner_size(1180., 820.)
             .build()?;
-            WebviewWindowBuilder::new(
+            let audience = WebviewWindowBuilder::new(
                 app,
                 "audience",
                 WebviewUrl::App("index.html?role=audience".into()),
             )
-            .title("Slive · 投影")
+            .title("Slive")
+            .icon(tauri::include_image!("icons/128x128@2x.png"))?
+            .theme(theme)
+            // Keep the viewer ready without opening a projection before the user asks.
+            .visible(false)
             .focused(false)
             .inner_size(960., 600.)
             .build()?;
@@ -167,9 +188,17 @@ fn main() {
             }
             println!(
                 "DISPLAYS {}",
-                serde_json::to_string(&commands::displays(presenter).unwrap_or_default()).unwrap()
+                serde_json::to_string(&commands::displays(presenter.clone()).unwrap_or_default())
+                    .unwrap()
             );
             if std::env::var_os("NATIVE_POC_QA").is_some() {
+                println!(
+                    "STARTUP_WINDOWS {}",
+                    serde_json::json!({
+                        "presenterVisible": presenter.is_visible()?,
+                        "audienceVisible": audience.is_visible()?,
+                    })
+                );
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_secs(8));
