@@ -6,6 +6,12 @@
 
 | 日付 | 対象と記録 | 記録内のコミット情報 |
 | --- | --- | --- |
+| 2026-10-22 | [Slive ランチャー上の大きさ・見た目の中心](slive-icon-optical.json) | 未コミット差分 |
+| 2026-10-22 | [Slive 原本形状に復元・透明背景と全体拡大](slive-icon-original.json) | 未コミット差分 |
+| 2026-10-22 | [Slive 下部バーだけ中央揃え・拡幅](slive-icon-bar.json) | 未コミット差分 |
+| 2026-10-22 | [Slive 透明背景・青いパーツの中央揃えと拡幅](slive-icon-wide.json) | 未コミット差分 |
+| 2026-10-22 | [Slive アイコン内マーク拡大](slive-icon-enlarged.json) | 未コミット差分 |
+| 2026-10-21 | [Slive 起動時の投影表示・白い角丸アイコン](slive-startup-icon.json) | 未コミット差分 |
 | 2026-10-20 | [自動 Vue ホーム・サブパス配信](pages-subpath.json) | 基点 `d685290`＋未コミット差分 |
 | 2026-10-19 | [Slidock フレームワーク・配布と利用側検証](framework-v01.json) | 基点 `d685290`＋未コミット差分 |
 | 2026-10-19 | [フレームワークの位置づけ・文書整理とローカルcheck](repository-organization.json) | 基点 `f102220`＋未コミット差分 |

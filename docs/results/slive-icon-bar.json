@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-22",
+  "scope": "Slive native icon: center and widen only the bottom bar",
+  "status": "superseded",
+  "geometry": {
+    "overallScale": 1.15,
+    "screen": {
+      "x": 9,
+      "width": 77
+    },
+    "bar": {
+      "x": 30.75,
+      "width": 58.5,
+      "centerX": 60
+    },
+    "background": "transparent"
+  },
+  "checks": {
+    "generation": "passed",
+    "visualInspection": "passed",
+    "desktopBuild": "passed",
+    "launcher": "updated and icon cache refreshed"
+  },
+  "limitations": [
+    "Windows/macOS icon appearance not verified"
+  ],
+  "evidence": [
+    "artifacts/slive-icon-bar/build.log",
+    "artifacts/slive-icon-bar/check.log"
+  ],
+  "note": "Bar adjustment withdrawn by user before verification completed; final geometry recorded in slive-icon-original.json."
+}

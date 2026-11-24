@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-22",
+  "scope": "Native icon optical size and alignment",
+  "status": "passed",
+  "geometry": {
+    "canvas": 144,
+    "scaleBefore": 1.15,
+    "scaleAfter": 1.3,
+    "translationAfterScale": {
+      "x": 4,
+      "y": 4
+    },
+    "relativeGeometry": "unchanged",
+    "background": "transparent"
+  },
+  "checks": {
+    "generation": "passed",
+    "desktopBuild": "passed",
+    "visualComparison": {
+      "status": "passed",
+      "sizes": [
+        32,
+        48,
+        64
+      ],
+      "references": [
+        "installed Google Chrome icon",
+        "installed Firefox icon"
+      ],
+      "backgrounds": [
+        "light",
+        "dark"
+      ]
+    },
+    "launcher": "updated and icon cache refreshed",
+    "pnpmCheck": {
+      "status": "passed",
+      "tests": 410,
+      "pass": 401,
+      "fail": 0,
+      "skipped": 9
+    }
+  },
+  "limitations": [
+    "Visual balance is subjective; user desktop appearance remains to be assessed.",
+    "macOS and Windows not verified."
+  ],
+  "evidence": [
+    "artifacts/slive-icon-optical/comparison.png",
+    "artifacts/slive-icon-optical/comparison.html",
+    "artifacts/slive-icon-optical/build.log",
+    "artifacts/slive-icon-optical/check.log"
+  ]
+}

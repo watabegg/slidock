@@ -153,7 +153,7 @@ fn main() {
             .theme(theme)
             .inner_size(1180., 820.)
             .build()?;
-            WebviewWindowBuilder::new(
+            let audience = WebviewWindowBuilder::new(
                 app,
                 "audience",
                 WebviewUrl::App("index.html?role=audience".into()),
@@ -161,6 +161,8 @@ fn main() {
             .title("Slive")
             .icon(tauri::include_image!("icons/128x128@2x.png"))?
             .theme(theme)
+            // Keep the viewer ready without opening a projection before the user asks.
+            .visible(false)
             .focused(false)
             .inner_size(960., 600.)
             .build()?;
@@ -186,9 +188,17 @@ fn main() {
             }
             println!(
                 "DISPLAYS {}",
-                serde_json::to_string(&commands::displays(presenter).unwrap_or_default()).unwrap()
+                serde_json::to_string(&commands::displays(presenter.clone()).unwrap_or_default())
+                    .unwrap()
             );
             if std::env::var_os("NATIVE_POC_QA").is_some() {
+                println!(
+                    "STARTUP_WINDOWS {}",
+                    serde_json::json!({
+                        "presenterVisible": presenter.is_visible()?,
+                        "audienceVisible": audience.is_visible()?,
+                    })
+                );
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_secs(8));

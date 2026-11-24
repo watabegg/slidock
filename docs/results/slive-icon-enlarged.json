@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-22",
+  "scope": "Slive native icon inner mark",
+  "scale": 1.15,
+  "background": "unchanged white rounded tile",
+  "checks": {
+    "iconGeneration": "passed",
+    "visualInspection": "passed",
+    "launcherIcon": "updated and cache refreshed",
+    "desktopBuild": "passed",
+    "pnpmCheck": {
+      "status": "passed",
+      "tests": 410,
+      "pass": 401,
+      "fail": 0,
+      "skipped": 9
+    }
+  },
+  "status": "passed",
+  "limitations": [
+    "macOS and Windows icon appearance not verified"
+  ],
+  "evidence": [
+    "artifacts/slive-icon-enlarged/build.log",
+    "artifacts/slive-icon-enlarged/check.log"
+  ]
+}

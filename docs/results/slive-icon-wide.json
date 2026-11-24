@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-22",
+  "scope": "Slive native icon transparent background and wider centered blue parts",
+  "status": "passed",
+  "geometry": {
+    "overallScale": 1.15,
+    "bluePartsCenterX": 60,
+    "screenWidth": 115.5,
+    "standWidth": 58.5,
+    "bluePartsWidthMultiplier": 1.5
+  },
+  "checks": {
+    "generation": "passed",
+    "visualInspection": "passed",
+    "desktopBuild": "passed",
+    "launcher": "updated and icon cache refreshed",
+    "pnpmCheck": {
+      "status": "passed",
+      "tests": 410,
+      "pass": 401,
+      "fail": 0,
+      "skipped": 9
+    }
+  },
+  "limitations": [
+    "Windows/macOS appearance not verified"
+  ],
+  "evidence": [
+    "artifacts/slive-icon-wide/build.log",
+    "artifacts/slive-icon-wide/check.log"
+  ]
+}

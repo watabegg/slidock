@@ -6,9 +6,10 @@ const root = new URL('../', import.meta.url);
 const output = new URL('apps/slive/src-tauri/icons/', root);
 await mkdir(output, { recursive: true });
 const svg = await readFile(new URL('apps/slive/src/slive.svg', root), 'utf8');
-// The in-app logo includes generous spacing. OS launchers already provide their
-// own spacing, so use a tighter canvas without changing the approved artwork.
-const appIconSvg = svg.replace('viewBox="-12 -12 144 144"', 'viewBox="0 0 120 120"');
+// Preserve the artwork; compensate for its upper-left visual weight at launcher sizes.
+const appIconSvg = svg
+  .replace('</defs>', '</defs><g transform="translate(64 64) scale(1.3) translate(-60 -60)">')
+  .replace('</svg>', '</g></svg>');
 const browser = await chromium.launch({ headless: true });
 const pngs = new Map();
 try {
