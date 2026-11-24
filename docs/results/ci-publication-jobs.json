@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "fd32006",
+  "workingTree": "base commit plus uncommitted changes",
+  "ciRun": "45356073080",
+  "environment": {
+    "node": "v24.22.1",
+    "pnpm": "12.3.4",
+    "postgres": "17.11 (postgres:17-alpine, disposable Docker container)",
+    "database": "127.0.0.1:55461/hub_jobs",
+    "containerRemovedWithVolumes": true
+  },
+  "cause": {
+    "facts": [
+      "The unmodified HEAD reproduces the CI failure: partial viewer did not show the thumbnail retry recipe.",
+      "JobStatus.vue renders hub jobs retry; the verifier expects slidock jobs retry.",
+      "Commit 63321bb changed the verifier expectation from hub to slidock but retained hub in JobStatus.vue.",
+      "The command literal has been unchanged since ae0448c; the verifier has been unchanged since 63321bb.",
+      "The existing publication-jobs.json records a 2026-10-10 verification, before the rename."
+    ],
+    "conclusion": "The product UI retained the legacy CLI name during the rename. This mismatch predates 35f5fbe, 55a5bc8 and fd32006 and reproduces outside CI. The verifier correctly expects the documented primary CLI name; hub remains a compatibility alias."
+  },
+  "fix": {
+    "file": "packages/slidock/src/frontend/JobStatus.vue",
+    "change": "Render slidock jobs retry for failed and partial jobs.",
+    "verifierChanged": false
+  },
+  "checks": [
+    {
+      "command": "HUB_TEST_DATABASE_URL=<isolated-local-postgres-url> pnpm verify:publication-jobs",
+      "phase": "before fix",
+      "exitCode": 1,
+      "passed": 14,
+      "failed": 1,
+      "log": "artifacts/ci-publication-jobs-fix/before.log",
+      "evidence": "apps/slidock-worker/artifacts/publication-jobs/2026-11-24T08-44-15-164Z-a121aaf9/evidence.json"
+    },
+    {
+      "command": "HUB_TEST_DATABASE_URL=<isolated-local-postgres-url> pnpm verify:publication-jobs",
+      "phase": "after fix",
+      "exitCode": 0,
+      "passed": 16,
+      "failed": 0,
+      "cloudflareInjectedBindingChecks": 16,
+      "externalBrowserResponsesReceived": 0,
+      "log": "artifacts/ci-publication-jobs-fix/after.log",
+      "evidence": "apps/slidock-worker/artifacts/publication-jobs/2026-11-24T08-45-08-107Z-f01b2d23/evidence.json"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "log": "artifacts/ci-publication-jobs-fix/lint.log"
+    },
+    {
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "log": "artifacts/ci-publication-jobs-fix/format-check.log"
+    },
+    {
+      "command": "HUB_TEST_DATABASE_URL=<isolated-local-postgres-url> pnpm check",
+      "exitCode": 0,
+      "postgresTestsEnabled": true,
+      "log": "artifacts/ci-publication-jobs-fix/check.log"
+    }
+  ],
+  "limitations": [
+    "The GitHub Actions run has not been rerun with this change.",
+    "Older commits were inspected through Git history, not executed in separate checkouts.",
+    "Cloudflare verification uses local workerd with injected bindings; no live Browser Run or cloud deployment was tested.",
+    "The complete portable CI job and other unrelated verification suites were not rerun."
+  ]
+}

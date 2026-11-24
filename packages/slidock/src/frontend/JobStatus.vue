@@ -127,7 +127,7 @@ const retryCommand = computed(() => {
   const value = job.value;
   if (!value || (value.status !== 'failed' && value.status !== 'partial')) return '';
   const stage = value.status === 'partial' || value.phase === 'thumbnail' ? 'thumbnail' : 'all';
-  return `hub jobs retry --id ${props.deckId} --job ${props.jobId} --stage ${stage}`;
+  return `slidock jobs retry --id ${props.deckId} --job ${props.jobId} --stage ${stage}`;
 });
 const publicErrorCode = computed(() => {
   const value = job.value;
