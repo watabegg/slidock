@@ -63,11 +63,16 @@ try {
   await page.getByRole('button', { name: 'bbb', exact: true }).click();
   check('Category filter bbb', (await page.locator('.deck-card').count()) === 2);
   await page.getByRole('button', { name: /すべて/ }).click();
+  // Slidev keeps controls visible when the viewport is narrower than the slide aspect ratio.
+  await page.setViewportSize({ width: 1440, height: 810 });
   await page.locator('.deck-card').first().click();
   await page.locator('.slidev-page[data-slidev-no="1"]').waitFor({ state: 'visible' });
   await page.locator('.slide-library-home').waitFor({ state: 'visible' });
   await page.mouse.move(1400, 10);
-  await page.waitForTimeout(2500);
+  await page.waitForFunction(() => {
+    const controls = document.querySelector('#slide-container nav')?.parentElement;
+    return controls && Number(getComputedStyle(controls).opacity) === 0;
+  });
   check(
     'Home link persists while controls hide',
     await page.locator('.slide-library-home').isVisible(),

@@ -1,0 +1,176 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "4f9f4763199486dd2b1944e69dd17fe0cbe43ebb",
+  "scope": "CI remote render ACK race and verification-script stability audit",
+  "report": "ci-stability.md",
+  "sharedTree": true,
+  "environment": {
+    "node": "v24.22.1",
+    "pnpm": "12.3.4",
+    "chromium": "153.0.8010.12",
+    "remoteCpuAffinity": "0"
+  },
+  "checks": {
+    "baseline": {
+      "command": "node apps/slive/scripts/verify-remote.mjs",
+      "exitCodes": [
+        1
+      ],
+      "httpChecks": 9,
+      "httpsChecks": 33,
+      "log": "artifacts/ci-stability/remote-baseline.log"
+    },
+    "regressionBefore": {
+      "command": "node --test artifacts/ci-stability/bridge-before.test.mjs",
+      "exitCodes": [
+        1
+      ],
+      "tests": 3,
+      "failed": 3,
+      "log": "artifacts/ci-stability/bridge-before-test.log"
+    },
+    "remote": {
+      "command": "taskset -c 0 node apps/slive/scripts/verify-remote.mjs",
+      "exitCodes": [
+        0,
+        0,
+        0
+      ],
+      "logs": [
+        "artifacts/ci-stability/remote-fixed-1.log",
+        "artifacts/ci-stability/remote-fixed-2.log",
+        "artifacts/ci-stability/remote-fixed-3.log"
+      ],
+      "runs": [
+        {
+          "http": {
+            "pass": true,
+            "checks": 33
+          },
+          "https": {
+            "pass": true,
+            "checks": 33
+          }
+        },
+        {
+          "http": {
+            "pass": true,
+            "checks": 33
+          },
+          "https": {
+            "pass": true,
+            "checks": 33
+          }
+        },
+        {
+          "http": {
+            "pass": true,
+            "checks": 33
+          },
+          "https": {
+            "pass": true,
+            "checks": 33
+          }
+        }
+      ]
+    },
+    "workers": {
+      "command": "pnpm --filter @slidock/workers verify",
+      "exitCodes": [
+        0,
+        0,
+        0
+      ],
+      "logs": [
+        "artifacts/ci-stability/workers-1.log",
+        "artifacts/ci-stability/workers-2.log",
+        "artifacts/ci-stability/workers-3.log"
+      ],
+      "checksPerRun": 39
+    },
+    "library": {
+      "command": "pnpm --filter @slidock/slidock verify:library",
+      "exitCodes": [
+        0,
+        0,
+        0
+      ],
+      "logs": [
+        "artifacts/ci-stability/library-1.log",
+        "artifacts/ci-stability/library-2.log",
+        "artifacts/ci-stability/library-3.log"
+      ]
+    },
+    "bridge": {
+      "command": "node --test packages/protocol/tests/bridge.test.mjs",
+      "exitCodes": [
+        0,
+        0,
+        0
+      ],
+      "logs": [
+        "artifacts/ci-stability/bridge-fixed-1.log",
+        "artifacts/ci-stability/bridge-fixed-2.log",
+        "artifacts/ci-stability/bridge-fixed-3.log"
+      ],
+      "testsPerRun": 3
+    },
+    "protocol": {
+      "command": "pnpm --filter @slidock/protocol test",
+      "exitCodes": [
+        0
+      ],
+      "log": "artifacts/ci-stability/protocol-test.log"
+    },
+    "fixturesBuild": {
+      "command": "pnpm build:slidock:fixtures",
+      "exitCodes": [
+        0
+      ],
+      "log": "artifacts/ci-stability/build-fixtures.log"
+    },
+    "workerBuild": {
+      "command": "pnpm build:workers",
+      "exitCodes": [
+        0
+      ],
+      "log": "artifacts/ci-stability/build-workers.log"
+    },
+    "lint": {
+      "command": "pnpm lint",
+      "exitCodes": [
+        0
+      ],
+      "log": "artifacts/ci-stability/lint.log"
+    },
+    "format": {
+      "command": "pnpm format:check",
+      "exitCodes": [
+        0
+      ],
+      "log": "artifacts/ci-stability/format-check.log"
+    },
+    "check": {
+      "command": "pnpm check",
+      "exitCodes": [
+        0
+      ],
+      "log": "artifacts/ci-stability/check.log",
+      "tests": 425,
+      "pass": 416,
+      "fail": 0,
+      "skipped": 9,
+      "skipReason": "HUB_TEST_DATABASE_URL not configured for PostgreSQL integration",
+      "boundaryViolations": 0,
+      "migrationExceptions": 0,
+      "warning": "Wrangler log file writes under read-only home returned EROFS; type generation and check exited 0."
+    }
+  },
+  "limitations": [
+    "GitHub Actions not rerun; exact CI DOM event order unavailable",
+    "9 PostgreSQL integration tests skipped, not passes",
+    "No full portable, packed, publication-jobs, native, clean-container regression",
+    "No Rust/Tauri/WebKit, Windows, physical dual display or deployed cloud validation",
+    "Other worker owns workflow, root scripts and portable changes"
+  ]
+}

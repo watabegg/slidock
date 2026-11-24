@@ -208,30 +208,35 @@ function isNativeMessageRecord(value: unknown): value is Record<string, unknown>
         await router.replace({ path: `/${state.page}`, query });
         const deadline = performance.now() + 12000;
         let slide: HTMLElement | undefined;
-        while (state === latest && !(slide = currentSlide(state.page))) {
+        while (state === latest) {
           if (performance.now() > deadline) throw new Error('current slide did not become visible');
+          slide = currentSlide(state.page);
+          if (slide) {
+            await bounded(
+              Promise.all([
+                document.fonts?.ready || Promise.resolve(),
+                ...[...slide.querySelectorAll<HTMLImageElement>('img')].map((image) =>
+                  image.decode
+                    ? image.decode()
+                    : image.complete
+                      ? Promise.resolve()
+                      : new Promise<void>((resolve, reject) => {
+                          image.addEventListener('load', () => resolve(), { once: true });
+                          image.addEventListener('error', reject, { once: true });
+                        }),
+                ),
+              ]),
+            );
+            if (state !== latest) break;
+            await frame();
+            await frame();
+            // Re-entering a slide can cancel its leave transition and reset opacity
+            // to zero after router.replace resolves. Keep waiting through that reset.
+            slide = currentSlide(state.page);
+            if (slide) break;
+          }
           await frame();
         }
-        if (state !== latest) continue;
-        await bounded(
-          Promise.all([
-            document.fonts?.ready || Promise.resolve(),
-            ...[...slide!.querySelectorAll<HTMLImageElement>('img')].map((image) =>
-              image.decode
-                ? image.decode()
-                : image.complete
-                  ? Promise.resolve()
-                  : new Promise<void>((resolve, reject) => {
-                      image.addEventListener('load', () => resolve(), { once: true });
-                      image.addEventListener('error', reject, { once: true });
-                    }),
-            ),
-          ]),
-        );
-        if (state !== latest) continue;
-        await frame();
-        await frame();
-        slide = currentSlide(state.page);
         if (state !== latest) continue;
         if (!slide || Number(router.currentRoute.value.query.clicks || 0) !== state.clickIndex) {
           throw new Error('rendered route differs from Rust state');

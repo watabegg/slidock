@@ -76,6 +76,32 @@ async function verify(remoteOrigin, protocol, metadata) {
   };
   let revision = 0;
   let state;
+  const waitForRendered = async (state, errorCount) => {
+    await page.waitForFunction(
+      ({ state, errorCount }) =>
+        window.poc.errors.length > errorCount ||
+        window.poc.reports.some(
+          (report) =>
+            report.deckId === state.deckId &&
+            report.page === state.page &&
+            report.clickIndex === state.clickIndex &&
+            report.sessionRevision === state.sessionRevision,
+        ),
+      { state, errorCount },
+      { timeout: 18000 },
+    );
+    const outcome = await page.evaluate(
+      ({ state, errorCount }) => ({
+        errors: window.poc.errors.slice(errorCount),
+        report: window.poc.reports.find(
+          (report) => report.sessionRevision === state.sessionRevision,
+        ),
+      }),
+      { state, errorCount },
+    );
+    assert.deepEqual(outcome.errors, [], `render ${JSON.stringify(state)}: ${outcome.errors}`);
+    return outcome.report;
+  };
   const setState = async (deck, pageNumber = 1, clickIndex = 0) => {
     state = {
       deckId: deck.id,
@@ -84,20 +110,9 @@ async function verify(remoteOrigin, protocol, metadata) {
       clickIndex,
       sessionRevision: revision++,
     };
+    const errorCount = await page.evaluate(() => window.poc.errors.length);
     await page.evaluate((state) => window.poc.controller.update(state), state);
-    await page.waitForFunction(
-      (state) =>
-        window.poc.reports.some(
-          (report) =>
-            report.deckId === state.deckId &&
-            report.page === state.page &&
-            report.clickIndex === state.clickIndex &&
-            report.sessionRevision === state.sessionRevision,
-        ),
-      state,
-      { timeout: 18000 },
-    );
-    return page.evaluate(() => window.poc.reports.at(-1));
+    return waitForRendered(state, errorCount);
   };
   try {
     await page.goto(`${result.hostOrigin}/`);
@@ -114,7 +129,7 @@ async function verify(remoteOrigin, protocol, metadata) {
       remoteOrigin,
       state,
     });
-    await page.waitForFunction(() => window.poc.reports.length > 0, null, { timeout: 18000 });
+    await waitForRendered(state, 0);
     const initial = await page.evaluate(() => ({
       report: window.poc.reports.at(-1),
       token: window.poc.controller.active.token,

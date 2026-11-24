@@ -191,7 +191,17 @@ try {
       ),
     );
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(350);
+    await page.waitForFunction(() => {
+      const element = document.querySelector(
+        '.slidev-page[data-slidev-no="3"] [data-testid="click-one"]',
+      );
+      return (
+        element &&
+        new URL(location.href).searchParams.get('clicks') === '1' &&
+        getComputedStyle(element).visibility !== 'hidden' &&
+        Number(getComputedStyle(element).opacity) > 0
+      );
+    });
     check(
       'v-click revealed without changing slide',
       new URL(page.url()).pathname.endsWith('/3') &&
