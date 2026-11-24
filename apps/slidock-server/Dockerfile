@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Build from the repository root: docker build -f apps/slidock-server/Dockerfile .
-ARG NODE_IMAGE=node:24.15.0-bookworm-slim
+ARG NODE_IMAGE=node:24.22.1-bookworm-slim
 FROM ${NODE_IMAGE} AS build
 WORKDIR /workspace
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

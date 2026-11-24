@@ -6,7 +6,7 @@
 
 本ツールは非公開パッケージ `@slidock/cli`（バージョン 0.1.0）として構成されており、npm レジストリへの公開は行われていません。コマンドラインバイナリとして `slidock` と `slive` を提供します。
 
-- 動作要件: Node.js 24.15 以上、pnpm 12.3.4
+- 動作要件: Node.js 24.22.1 以上、pnpm 12.3.4
 - ワークスペースのビルド: `pnpm install --frozen-lockfile; pnpm build:packages`
 - ヘルプの確認: リポジトリ直下で `pnpm slidock --help` および `pnpm slive:cli --help` を実行
 

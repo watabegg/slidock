@@ -44,7 +44,7 @@ export async function packPackages(destination, names = packageNames) {
         private: true,
         type: 'module',
         packageManager: 'pnpm@12.3.4',
-        engines: { node: '>=24.15.0' },
+        engines: { node: '>=24.22.1' },
         dependencies,
       },
       null,

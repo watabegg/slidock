@@ -206,7 +206,7 @@ async function readConfig(configPath: string): Promise<Record<string, unknown>> 
         error.message,
       );
     if (isTypeScriptLoadFailure)
-      throw configError('TypeScript config requires Node.js 24.15.0 or newer', error);
+      throw configError('TypeScript config requires Node.js 24.22.1 or newer', error);
     throw configError(
       `Could not load project config ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
       error,

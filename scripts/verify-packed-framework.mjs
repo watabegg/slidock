@@ -957,10 +957,11 @@ async function findBrowser() {
 
 export async function verifyPackedFramework({ installOnly = false, reusePacked = false } = {}) {
   assert(!(installOnly && reusePacked), '--install-only and --reuse-packed cannot be combined');
-  const [nodeMajor, nodeMinor] = process.versions.node.split('.').map(Number);
+  const [nodeMajor, nodeMinor, nodePatch] = process.versions.node.split('.').map(Number);
   assert(
-    nodeMajor > 24 || (nodeMajor === 24 && nodeMinor >= 15),
-    `Node.js 24.15.0 or newer is required; found ${process.version}`,
+    nodeMajor > 24 ||
+      (nodeMajor === 24 && (nodeMinor > 22 || (nodeMinor === 22 && nodePatch >= 1))),
+    `Node.js 24.22.1 or newer is required; found ${process.version}`,
   );
   const pack = reusePacked ? await loadPreviouslyPackedFramework() : await packFramework();
   const resultRoot = join(artifactRoot, 'consumer', pack.report.releaseSetHash);
