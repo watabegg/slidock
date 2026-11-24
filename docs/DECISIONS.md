@@ -82,6 +82,10 @@ pnpm ワークスペース全体で Oxlint、Oxfmt、strict TypeScript、`vue-ts
 
 ビルドおよび検証作業には外部パッケージの取得とネットワーク接続が必要であり、オフライン環境でのビルド動作は保証されない。
 
+### Workers / Slive のネイティブ回帰検証（2026-11-24）
+
+検証用 Worker はサムネイル用レンダラーを持たないため、ネイティブ回帰用の公開は `--thumbnail none --require-jobs` で行う。ジョブの `succeeded` と `publication.thumbnail = skipped`、リビジョン固定の相対 entry を検査し、ネイティブ QA に渡す際に公開元の絶対 URL へ変換する。CLI の `partial` に対する終了コード1と公開時のサムネイル既定値 `auto` は維持する。検証用の受付票は各実行の `artifacts/` 内に保存する。
+
 ---
 
 ## 9 共通サーバー・実行環境・永続化・デプロイの分離

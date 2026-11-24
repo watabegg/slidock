@@ -1,0 +1,80 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "b317dfb",
+  "scope": "CI native verification scripts; no application behavior changes",
+  "environment": {
+    "platform": "Linux, Xvfb and dbus-run-session, GDK_BACKEND=x11, WAYLAND_DISPLAY unset",
+    "node": "v24.22.1",
+    "pnpm": "12.3.4",
+    "rustc": "1.96.1",
+    "webkitSdk": "2.52.6 via apps/slive/scripts/desktop-env.sh"
+  },
+  "facts": [
+    "The user had already renamed verify-stage.mjs to verify-slive.mjs; the rename is retained.",
+    "The local Worker harness has no BROWSER binding. CLI publish defaults to thumbnail=auto, and partial publication returns exit code 1 by contract.",
+    "The original verifier expected the legacy flat publication response; the jobs response stores revision and a relative entry in data.publication.",
+    "With thumbnail=none and require-jobs, both publications succeeded with thumbnail=skipped. Both native phases completed."
+  ],
+  "inference": "The reported exit code 1 matches the thumbnail-unavailable contract. The obsolete flat response expectation would fail next. Both are stale verifier assumptions; no application behavior change is needed.",
+  "fix": "Skip thumbnails explicitly, require jobs, validate the succeeded job and nested publication, resolve the pinned relative entry against the Worker origin, and isolate CLI receipts under the run evidence directory.",
+  "checks": {
+    "pnpm build:slidock:fixtures": {
+      "exitCode": 0,
+      "log": "artifacts/ci-native-debug/fixtures.log"
+    },
+    "pnpm verify:workers-slive": {
+      "exitCode": 0,
+      "log": "artifacts/ci-native-debug/workers-slive.log",
+      "report": "artifacts/step7/2026-11-24T09-07-48-539Z-1547/result.json",
+      "nativeAssertions": {
+        "a": 18,
+        "b": 17
+      },
+      "reconnectNotesPreserved": true,
+      "revisionWarning": true
+    },
+    "pnpm verify:slive": {
+      "exitCode": 0,
+      "log": "artifacts/ci-native-debug/slive.log",
+      "report": "artifacts/step4/gate.json",
+      "nativeReport": "artifacts/step4/native-qa.json",
+      "nativeAssertions": 35,
+      "startupWindowsPassed": true,
+      "sourceRestored": true,
+      "chromiumBridgeAssertions": {
+        "http": 33,
+        "https": 33
+      },
+      "chromiumFlicker": {
+        "sameDeckNavigations": 0,
+        "sameDeckBlankFrames": 0,
+        "switchBlankFrames": 0,
+        "framesAfterSwitch": 2
+      }
+    },
+    "pnpm lint": {
+      "exitCode": 0,
+      "log": "artifacts/ci-native-debug/lint.log"
+    },
+    "pnpm format:check": {
+      "exitCode": 0,
+      "log": "artifacts/ci-native-debug/format-check.log"
+    },
+    "pnpm check": {
+      "exitCode": 0,
+      "log": "artifacts/ci-native-debug/check.log",
+      "tests": 416,
+      "pass": 407,
+      "fail": 0,
+      "skipped": 9,
+      "boundaryViolations": 0,
+      "migrationExceptions": 0,
+      "skipReason": "9 PostgreSQL integration tests require HUB_TEST_DATABASE_URL; skips are not passes."
+    }
+  },
+  "limitations": [
+    "These are local runs with the existing extracted Linux SDK and build caches, not a rerun on a clean GitHub Actions runner.",
+    "No cloud deployment, real Access integration, Windows, or physical dual-display verification was performed.",
+    "The native Worker scenario deliberately skips thumbnail rendering; it does not verify an external browser renderer."
+  ]
+}

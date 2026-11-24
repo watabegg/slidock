@@ -86,11 +86,14 @@ function runHubPublish(origin, sourcePath) {
         sourcePath,
         '--assets',
         assetsPath,
+        '--thumbnail',
+        'none',
+        '--require-jobs',
         '--json',
       ],
       {
         cwd: repository,
-        env: process.env,
+        env: { ...process.env, XDG_STATE_HOME: join(evidenceDirectory, 'cli-state') },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
@@ -110,15 +113,19 @@ function runHubPublish(origin, sourcePath) {
         const envelope = JSON.parse(stdout.trim());
         if (envelope.ok !== true || envelope.command !== 'slidock publish')
           throw new Error('slidock publish returned an invalid JSON envelope');
-        const result = envelope.data;
+        const data = envelope.data;
+        const result = data?.publication;
         if (
-          result?.id !== deckId ||
+          data?.id !== deckId ||
+          data.deckId !== deckId ||
+          data.status !== 'succeeded' ||
+          result?.thumbnail !== 'skipped' ||
           typeof result.revision !== 'string' ||
           !revisionPattern.test(result.revision) ||
-          result.entry !== `${origin}/${deckId}/1?revision=${result.revision}`
+          result.entry !== `/${deckId}/1?revision=${result.revision}`
         )
           throw new Error('slidock publish returned an invalid pinned entry');
-        accept(result);
+        accept({ ...result, id: data.id, entry: new URL(result.entry, origin).href });
       } catch (error) {
         reject(error);
       }

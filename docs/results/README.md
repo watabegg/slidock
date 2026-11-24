@@ -6,6 +6,7 @@
 
 | 日付 | 対象と記録 | 記録内のコミット情報 |
 | --- | --- | --- |
+| 2026-11-24 | [CI native の検証前提修正と実ウィンドウ回帰](ci-native.json) | 基点 `b317dfb`＋未コミット差分 |
 | 2026-11-24 | [CI 公開ジョブの再試行コマンド表示](ci-publication-jobs.json) | 基点 `fd32006`＋未コミット差分 |
 | 2026-11-24 | [CI framework の開発監視の起動時競合](ci-framework-dev-scan.json) | 基点 `123254b`＋未コミット差分 |
 | 2026-11-24 | [portable の CSS 検査修正と全段階検証](portable-ci-fix.json) | 基点 `a5c2e96`＋未コミット差分 |
