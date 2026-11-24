@@ -6,6 +6,7 @@
 
 | 日付 | 対象と記録 | 記録内のコミット情報 |
 | --- | --- | --- |
+| 2026-11-24 | [CI framework の開発監視の起動時競合](ci-framework-dev-scan.json) | 基点 `123254b`＋未コミット差分 |
 | 2026-11-24 | [portable の CSS 検査修正と全段階検証](portable-ci-fix.json) | 基点 `a5c2e96`＋未コミット差分 |
 | 2026-11-24 | [公式テーマのローカル画像・frontmatter の相対画像](relative-frontmatter-images.json) | 未コミット差分 |
 | 2026-10-22 | [Slive ランチャー上の大きさ・見た目の中心](slive-icon-optical.json) | 未コミット差分 |

@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "123254bdfefae9645747531088e2486810994f6d",
+  "scope": "framework CI dev-add timeout; initial collection watcher scan",
+  "environment": {
+    "platform": "linux",
+    "node": "v24.22.1",
+    "pnpm": "12.3.4",
+    "workspaceVite": "8.3.3",
+    "packedNpmConsumerVite": "8.3.8"
+  },
+  "facts": [
+    "The unmodified pnpm verify:packed-framework passed locally.",
+    "The home Vite watcher used ignoreInitial=true by default and startup did not wait for its initial source scan.",
+    "Creating third/slides.md inside the initial watcher readdir left the catalog at [second,welcome]; editing welcome later made third appear.",
+    "Replacing only the generated dev-worker.js with transpiled 55a5bc8^ source reproduced the same omission for 35 seconds; a later edit recovered third. The collection watcher source is unchanged between 55a5bc8^ and HEAD.",
+    "The regression test fails against the original generated dev.mjs after 30 seconds and passes with ignoreInitial=false.",
+    "Holding the first sourceRoot watcher read until after server readiness and then creating third reproduced [second,welcome] for 32 seconds with the HEAD watcher; the fixed watcher discovered third without another filesystem edit."
+  ],
+  "inference": "The CI failure is consistent with this startup race. CI load can change scan timing, but the saved CI log has no watcher/refresh trace to prove the exact interleaving or quantify runner slowness.",
+  "fix": "Set ignoreInitial=false on the home watcher so files first found after the catalog snapshot trigger collection reconciliation. Retain 200ms polling, the 250ms debounce and the existing verification timeouts.",
+  "checks": {
+    "pnpm verify:packed-framework (before changes)": {
+      "exitCode": 0,
+      "log": "artifacts/ci-framework-debug/baseline.log"
+    },
+    "node --test packages/slidock/tests/dev-lifecycle.test.mjs (before fix)": {
+      "exitCode": 1,
+      "expectedFailure": "third missing from catalog after initial scan",
+      "log": "artifacts/ci-framework-debug/regression-before.log"
+    },
+    "pnpm --filter @slidock/slidock build:node": {
+      "exitCode": 0,
+      "log": "artifacts/ci-framework-debug/build-node.log"
+    },
+    "node --test packages/slidock/tests/dev-lifecycle.test.mjs (after fix)": {
+      "exitCode": 0,
+      "tests": 5,
+      "log": "artifacts/ci-framework-debug/regression-after.log"
+    },
+    "pnpm lint": {
+      "exitCode": 0,
+      "log": "artifacts/ci-framework-debug/lint.log"
+    },
+    "pnpm format:check": {
+      "exitCode": 0,
+      "log": "artifacts/ci-framework-debug/format-check.log"
+    },
+    "pnpm verify:packed-framework (after fix)": {
+      "exitCode": 0,
+      "log": "artifacts/ci-framework-debug/packed-framework-after.log",
+      "releaseSetHash": "9bfa759d9cd396879cffb881fcf5e5cfb939a9d0ea8536d11466d5883a47c09f",
+      "report": "artifacts/framework-v01/consumer/9bfa759d9cd396879cffb881fcf5e5cfb939a9d0ea8536d11466d5883a47c09f/verification-report.json",
+      "lifecycles": {
+        "npm": [
+          "initial",
+          "add",
+          "remove",
+          "empty",
+          "recovery"
+        ],
+        "pnpm": [
+          "initial",
+          "add",
+          "remove",
+          "empty",
+          "recovery"
+        ]
+      }
+    },
+    "pnpm check": {
+      "exitCode": 0,
+      "tests": 416,
+      "pass": 407,
+      "fail": 0,
+      "skipped": 9,
+      "boundaryViolations": 0,
+      "migrationExceptions": 0,
+      "log": "artifacts/ci-framework-debug/check.log",
+      "skipReason": "9 PostgreSQL integration tests require HUB_TEST_DATABASE_URL; skips are not counted as passes."
+    },
+    "post-readiness scan comparison": {
+      "commands": [
+        "node artifacts/ci-framework-debug/post-ready.mjs --baseline",
+        "node artifacts/ci-framework-debug/post-ready.mjs"
+      ],
+      "exitCodes": [
+        0,
+        0
+      ],
+      "baselineMeaning": "Expected omission reproduced against a separate copy of HEAD dev.mjs; generated production modules were not overwritten.",
+      "logs": [
+        "artifacts/ci-framework-debug/post-ready-before.log",
+        "artifacts/ci-framework-debug/post-ready-after.log"
+      ]
+    }
+  },
+  "limitations": [
+    "The exact GitHub Actions runner and run 45353594835 were not rerun.",
+    "The pre-image-change comparison replaced only dev-worker.js, not the whole repository checkout.",
+    "Other CI jobs, portable/container and native regressions are outside this task."
+  ]
+}

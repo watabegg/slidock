@@ -689,7 +689,12 @@ export async function startDev(initialConfig, port, resolveConfig, watchFiles = 
         host: '127.0.0.1',
         port,
         strictPort: true,
-        watch: { usePolling: true, interval: 200 },
+        watch: {
+          usePolling: true,
+          interval: 200,
+          // Reconcile files created between the catalog snapshot and the first scan.
+          ignoreInitial: false,
+        },
         fs: {
           allow: [
             searchForWorkspaceRoot(config.sourceRoot),
