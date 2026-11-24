@@ -1,4 +1,5 @@
 import './style.css';
+import './site.css';
 import { createApp } from 'vue';
 import DefaultHome from './DefaultHome.vue';
 import { showStartupError } from './startup-error.js';

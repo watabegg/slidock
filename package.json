@@ -52,7 +52,11 @@
     "verify:slidock:fixtures": "pnpm --filter @slidock/slidock verify:library",
     "verify:vue-frontend": "node scripts/verify-vue-frontend.mjs",
     "preview:slidock": "node packages/slidock/scripts/serve.mjs packages/slidock/artifacts/official-themes/site 4174",
-    "verify:slidock:dev": "node scripts/verify-dev-server.mjs"
+    "verify:slidock:dev": "node scripts/verify-dev-server.mjs",
+    "pack:framework": "pnpm build:packages && node scripts/pack-framework.mjs",
+    "verify:packed-framework": "pnpm build:packages && node scripts/verify-packed-framework.mjs",
+    "verify:framework-frontend": "pnpm build:packages && node scripts/verify-framework-frontend.mjs",
+    "verify:pages": "node scripts/verify-pages-subpath.mjs && node scripts/verify-pages-dev.mjs"
   },
   "devDependencies": {
     "@slidev/cli": "53.0.0",
@@ -81,5 +85,6 @@
   "version": "0.1.0",
   "engines": {
     "node": ">=24.15.0"
-  }
+  },
+  "license": "MIT"
 }

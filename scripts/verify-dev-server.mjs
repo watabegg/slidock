@@ -23,15 +23,17 @@ const sfc = (label) =>
   `<script setup>\nimport { SlidockHome, useCatalog } from '@slidock/slidock/frontend';\nconst { catalog, error } = useCatalog();\n</script>\n<template><SlidockHome v-if="catalog" :catalog="catalog"><template #nav><span id="custom-label">${label}</span></template></SlidockHome><p v-else-if="error">{{ String(error) }}</p></template>`;
 await writeFile(app, sfc('Before home edit'));
 const entry = join(output, 'entry.ts');
+const reloadFile = join(output, 'project-config.watch');
+await writeFile(reloadFile, 'initial\n');
 await writeFile(
   entry,
   `import { createApp } from 'vue';\nimport Home from './Home.vue';\nimport '@slidock/slidock/frontend/style.css';\ncreateApp(Home).mount('#app');`,
 );
-const server = await devHub({
+const buildOptions = {
   sourceRoot,
   frontendEntry: entry,
   outDir: join(output, 'unused-site'),
-  port: 0,
+  allowEmpty: true,
   profiles: {
     default: {
       dependencyRoot: root,
@@ -47,6 +49,13 @@ const server = await devHub({
     { id: 'Apple Basic/demo', entry: other, profile: 'apple' },
   ],
   chromiumExecutable: process.env.CHROMIUM_EXECUTABLE,
+};
+let liveDecks = buildOptions.decks;
+const server = await devHub({
+  ...buildOptions,
+  port: 0,
+  resolveOptions: async () => ({ ...buildOptions, decks: liveDecks }),
+  watchFiles: [reloadFile],
 });
 console.log(`Dev verification: ${server.url}`);
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE });
@@ -67,14 +76,40 @@ try {
   await page.goto(server.url);
   await page.locator('.deck-card').first().waitFor();
   assert.equal(await page.locator('.deck-card').count(), 2);
+  await page
+    .locator('.deck-preview img')
+    .evaluateAll((images) => images.forEach((image) => (image.loading = 'eager')));
   await until(
     () =>
       page
         .locator('.deck-preview img')
-        .evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0)),
+        .evaluateAll((images) =>
+          images.map((image) => ({
+            src: image.currentSrc,
+            complete: image.complete,
+            naturalWidth: image.naturalWidth,
+          })),
+        )
+        .then(
+          (images) =>
+            images.length === 2 &&
+            images.every((image) => image.complete && image.naturalWidth > 0),
+        ),
     'live thumbnails',
     120_000,
-  );
+  ).catch(async (error) => {
+    console.error(
+      'Home thumbnail diagnostics',
+      await page.locator('.deck-preview img').evaluateAll((images) =>
+        images.map((image) => ({
+          src: image.currentSrc,
+          complete: image.complete,
+          naturalWidth: image.naturalWidth,
+        })),
+      ),
+    );
+    throw error;
+  });
   checks.push('Home and live thumbnails work without a static site build');
   await page.evaluate(() => {
     window.hmrSentinel = 1;
@@ -185,14 +220,164 @@ try {
   checks.push(
     'Syntax errors show an overlay, a valid save recovers, and rapid saves converge on the latest content',
   );
-  await slide.goto(`${server.url}Apple%20Basic/demo/2`);
-  await slide
-    .locator('.slidev-page[data-slidev-no="2"]')
-    .waitFor({ state: 'visible', timeout: 60_000 });
+  const appleEntry = (
+    await fetch(new URL('catalog.json', server.url)).then((response) => response.json())
+  ).decks.find((deck) => deck.id === 'Apple Basic/demo').entry;
+  assert.equal(appleEntry, '/Apple%20Basic/demo/1');
+  const appleResponse = await slide.goto(`${server.url}Apple%20Basic/demo/2`);
+  try {
+    await slide
+      .locator('.slidev-page[data-slidev-no="2"]')
+      .waitFor({ state: 'visible', timeout: 60_000 });
+  } catch (error) {
+    console.error('Apple Basic route diagnostics', {
+      status: appleResponse?.status(),
+      url: slide.url(),
+      title: await slide.title(),
+      body: (await slide.locator('body').innerText()).slice(0, 1000),
+    });
+    throw error;
+  }
   await slide.getByRole('link', { name: 'ホームへ戻る', exact: true }).click();
   await slide.locator('.deck-card').first().waitFor();
   checks.push('Different themes and encoded deck paths work, with return navigation');
+
+  const topologySlide = await browser.newPage();
+  await topologySlide.addInitScript(() => localStorage.setItem('slidev-wake-lock', 'false'));
+  topologySlide.on('pageerror', (error) => errors.push(error.message));
+  let topologyConnected = false;
+  let topologySocketClosed = 0;
+  topologySlide.on('websocket', (socket) => {
+    socket.on('framereceived', ({ payload }) => {
+      try {
+        if (JSON.parse(String(payload)).type === 'connected') topologyConnected = true;
+      } catch {}
+    });
+    socket.on('close', () => topologySocketClosed++);
+  });
+  await topologySlide.goto(`${server.url}Default/demo/2`);
+  await topologySlide.locator('.slidev-page[data-slidev-no="2"]').waitFor({ state: 'visible' });
+  await until(() => topologyConnected, 'stable deck WebSocket before collection changes');
+  await topologySlide.evaluate(() => {
+    window.lifecycleSentinel = 'kept';
+  });
+
+  const nestedEntry = join(sourceRoot, 'Default/demo/child.md');
+  const nestedDeck = { id: 'Default/demo/child', entry: nestedEntry, profile: 'default' };
+  await mkdir(dirname(nestedEntry), { recursive: true });
+  await writeFile(nestedEntry, '---\ntitle: [broken\n---\n# Incomplete\n');
+  liveDecks = [...liveDecks, nestedDeck];
+  await writeFile(reloadFile, 'new deck with invalid source\n');
+  await page.locator('vite-error-overlay').waitFor();
+  assert.equal(
+    await fetch(new URL('catalog.json', server.url))
+      .then((response) => response.json())
+      .then((value) => value.decks.length),
+    2,
+  );
+  assert.equal(
+    await fetch(new URL('Default/demo/1', server.url)).then((response) => response.status),
+    200,
+  );
+  assert.equal(await topologySlide.evaluate(() => window.lifecycleSentinel), 'kept');
+  assert.equal(topologySocketClosed, 0);
+  checks.push(
+    'A malformed addition keeps the previous routes, catalog, runtime, and open slide usable',
+  );
+
+  await writeFile(nestedEntry, '---\ntitle: Nested child\n---\n# Nested child content\n');
+  await until(
+    async () =>
+      (
+        await fetch(new URL('catalog.json', server.url)).then((response) => response.json())
+      ).decks.some((deck) => deck.id === nestedDeck.id),
+    'valid child backend publication',
+  );
+  await page.locator('vite-error-overlay').waitFor({ state: 'detached' });
+  assert.equal(await topologySlide.evaluate(() => window.lifecycleSentinel), 'kept');
+  assert.equal(topologySocketClosed, 0);
+  const nestedRoute = await fetch(new URL('Default/demo/child/1', server.url));
+  assert.equal(nestedRoute.status, 200);
+  assert.match(await nestedRoute.text(), /navigation\.js/u);
+  const nestedPage = await browser.newPage();
+  await nestedPage.addInitScript(() => localStorage.setItem('slidev-wake-lock', 'false'));
+  nestedPage.on('pageerror', (error) => errors.push(error.message));
+  await nestedPage.goto(`${server.url}Default/demo/child/1`);
+  await nestedPage.locator('.slidev-page[data-slidev-no="1"]').waitFor({ state: 'visible' });
+  await until(
+    async () =>
+      (await nestedPage.locator('.slidev-page[data-slidev-no="1"]').textContent()).includes(
+        'Nested child content',
+      ),
+    'longest overlapping deck route renders the nested child',
+  );
+  await nestedPage.close();
+  checks.push(
+    'A valid save adds the longer overlapping route without restarting unchanged children',
+  );
+  await writeFile(source, markdown('Rapid 3', 'After collection add', '\n---\n\n# Added slide\n'));
+  await until(
+    async () =>
+      (await topologySlide.locator('.slidev-page[data-slidev-no="2"]').textContent()).includes(
+        'After collection add',
+      ),
+    'Markdown HMR after collection config change',
+  );
+  assert.equal(await topologySlide.evaluate(() => window.lifecycleSentinel), 'kept');
+  assert.equal(topologySocketClosed, 0);
+  checks.push('An unchanged child retains its open WebSocket and in-place Markdown HMR after add');
+
+  const removedThumbnail = (
+    await fetch(new URL('catalog.json', server.url)).then((response) => response.json())
+  ).decks.find((deck) => deck.id === nestedDeck.id).thumbnail.src;
+  liveDecks = liveDecks.filter((deck) => deck.id !== nestedDeck.id);
+  await writeFile(reloadFile, 'remove child\n');
+  await until(
+    async () =>
+      (await fetch(new URL('catalog.json', server.url)).then((response) => response.json())).decks
+        .length === 2,
+    'removed child catalog update',
+  );
+  assert.equal(
+    await fetch(new URL(removedThumbnail, server.url)).then((response) => response.status),
+    404,
+  );
+  assert.equal(
+    await fetch(new URL('NoSuchDeck/1', server.url)).then((response) => response.status),
+    404,
+  );
+  checks.push('Removing a child drops its route, thumbnail endpoint, and runtime');
+
+  liveDecks = [];
+  await writeFile(reloadFile, 'empty collection\n');
+  await until(
+    async () =>
+      (await fetch(new URL('catalog.json', server.url)).then((response) => response.json())).decks
+        .length === 0,
+    'empty collection publication',
+  );
+  assert.equal(
+    await fetch(new URL('Default/demo/1', server.url)).then((response) => response.status),
+    404,
+  );
+  checks.push('An empty collection serves its catalog and rejects stale slide routes');
+
+  liveDecks = [{ id: 'Default/demo', entry: source, profile: 'default' }];
+  await writeFile(reloadFile, 'first deck returns\n');
+  await until(
+    async () =>
+      (await fetch(new URL('catalog.json', server.url)).then((response) => response.json())).decks
+        .length === 1,
+    'first deck added to empty collection',
+  );
+  assert.equal(
+    await fetch(new URL('Default/demo/1', server.url)).then((response) => response.status),
+    200,
+  );
+  checks.push('An empty collection can gain its first deck');
+
   await page.screenshot({ path: join(output, 'home.png'), fullPage: true });
+  await topologySlide.close();
   assert.deepEqual(errors, []);
   await writeFile(join(output, 'results.json'), JSON.stringify({ checks, errors }, null, 2));
   console.log(JSON.stringify({ checks, errors }, null, 2));
@@ -211,3 +396,66 @@ assert.equal(
   false,
 );
 assert.ok((await readFile(source, 'utf8')).includes('Added slide'));
+
+const noBrowserRoot = join(output, 'no-browser/slides');
+const noBrowserOut = join(output, 'no-browser/site');
+const noBrowserEntry = join(noBrowserRoot, 'NoBrowser.md');
+const coveredEntry = join(noBrowserRoot, 'Covered.md');
+const coverPath = join(output, 'no-browser/cover.svg');
+await mkdir(noBrowserRoot, { recursive: true });
+await writeFile(noBrowserEntry, markdown('No browser', 'Placeholder thumbnail'));
+await writeFile(coveredEntry, markdown('Custom cover', 'Cover thumbnail'));
+await writeFile(
+  coverPath,
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="red"/></svg>',
+);
+const noBrowserServer = await devHub({
+  ...buildOptions,
+  sourceRoot: noBrowserRoot,
+  outDir: noBrowserOut,
+  decks: [
+    { id: 'NoBrowser', entry: noBrowserEntry, profile: 'default' },
+    { id: 'Covered', entry: coveredEntry, profile: 'default', cover: coverPath },
+  ],
+  thumbnails: 'none',
+  home: { title: '</script><script>not markup</script>' },
+  chromiumExecutable: join(output, 'missing-chromium'),
+  port: 0,
+});
+try {
+  const noBrowserCatalog = await fetch(new URL('catalog.json', noBrowserServer.url)).then(
+    (response) => response.json(),
+  );
+  const placeholderImage = await fetch(
+    new URL(
+      noBrowserCatalog.decks.find((deck) => deck.id === 'NoBrowser').thumbnail.src,
+      noBrowserServer.url,
+    ),
+  );
+  assert.equal(placeholderImage.status, 200);
+  assert.equal(placeholderImage.headers.get('content-type'), 'image/svg+xml');
+  assert.match(await placeholderImage.text(), /<svg/u);
+  const coverImage = await fetch(
+    new URL(
+      noBrowserCatalog.decks.find((deck) => deck.id === 'Covered').thumbnail.src,
+      noBrowserServer.url,
+    ),
+  );
+  assert.equal(coverImage.status, 200);
+  assert.equal(coverImage.headers.get('content-type'), 'image/svg+xml');
+  assert.match(await coverImage.text(), /fill="red"/u);
+  const homeHtml = await fetch(noBrowserServer.url).then((response) => response.text());
+  assert.match(homeHtml, /id="slidock-home-config" type="application\/json"/u);
+  assert.doesNotMatch(homeHtml, /<\/script><script>not markup/iu);
+  assert.equal(
+    await fetch(new URL('Unknown/1', noBrowserServer.url)).then((response) => response.status),
+    404,
+  );
+  checks.push(
+    'Thumbnail mode none serves an SVG placeholder and custom cover without launching Chromium',
+  );
+} finally {
+  await noBrowserServer.close();
+}
+await writeFile(join(output, 'results.json'), JSON.stringify({ checks, errors }, null, 2));
+console.log(JSON.stringify({ checks, errors }, null, 2));

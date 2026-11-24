@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { resolveRuntime } from './runtime.js';
 
@@ -9,9 +12,16 @@ export async function startSlidevDev(options: {
   theme: string;
   base: string;
 }) {
+  // Vite otherwise shares its optimizeDeps cache across Slidev child processes
+  // using the same dependency root. The parent owns this temporary cache so it
+  // can remove it even if the worker exits before completing shutdown.
+  const viteCacheDir = await mkdtemp(join(tmpdir(), 'slidock-vite-cache-'));
   const child = spawn(
     process.execPath,
-    [fileURLToPath(new URL('./dev-worker.js', import.meta.url)), JSON.stringify(options)],
+    [
+      fileURLToPath(new URL('./dev-worker.js', import.meta.url)),
+      JSON.stringify({ ...options, viteCacheDir }),
+    ],
     {
       cwd: options.dependencyRoot,
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
@@ -33,13 +43,20 @@ export async function startSlidevDev(options: {
     stream!.on('data', (chunk: Buffer) => {
       output = (output + chunk.toString()).slice(-6000);
     });
-  async function close() {
-    if (exited) return;
-    child.kill('SIGTERM');
-    const timer = setTimeout(() => child.kill('SIGKILL'), 3000);
-    timer.unref();
-    await completed;
-    clearTimeout(timer);
+  let closing: Promise<void> | undefined;
+  function close() {
+    if (closing) return closing;
+    closing = (async () => {
+      if (!exited) {
+        child.kill('SIGTERM');
+        const timer = setTimeout(() => child.kill('SIGKILL'), 3000);
+        timer.unref();
+        await completed;
+        clearTimeout(timer);
+      }
+      await rm(viteCacheDir, { recursive: true, force: true });
+    })();
+    return closing;
   }
   try {
     const origin = await new Promise<string>((resolve, reject) => {

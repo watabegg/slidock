@@ -2,6 +2,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createReadStream } from 'node:fs';
 import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { normalizeBasePath, stripBasePath } from './base-path.mjs';
 
 const DEFAULT_DECK_IDS = ['aaa/aaa1', 'aaa/aaa2', 'bbb/bbb1', 'bbb/bbb2'];
 const MIME_TYPES = new Map([
@@ -142,10 +143,17 @@ function sendNotFound(response) {
   response.end('Not Found\n');
 }
 
-export function createServer(siteRoot) {
+export function readSiteBasePath(siteRoot) {
+  const manifestPath = resolve(siteRoot, 'manifest.json');
+  if (!existsSync(manifestPath)) return '/';
+  return normalizeBasePath(JSON.parse(readFileSync(manifestPath, 'utf8')).basePath);
+}
+
+export function createServer(siteRoot, options = {}) {
   if (!isAbsolute(siteRoot)) throw new Error('site root must be an absolute path');
   const root = realpathSync(resolve(siteRoot));
   const deckIds = readDeckIds(root);
+  const basePath = normalizeBasePath(options.basePath ?? readSiteBasePath(root));
 
   return createHttpServer((request, response) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -154,7 +162,16 @@ export function createServer(siteRoot) {
       return;
     }
 
-    const segments = parsePath(request.url);
+    const rawPath = (request.url || '/').split('?', 1)[0];
+    const queryIndex = (request.url || '').indexOf('?');
+    const query = queryIndex < 0 ? '' : request.url.slice(queryIndex);
+    if (basePath !== '/' && rawPath === basePath.slice(0, -1)) {
+      response.writeHead(308, { location: `${basePath}${query}`, 'cache-control': 'no-store' });
+      response.end();
+      return;
+    }
+    const localPath = stripBasePath(rawPath, basePath);
+    const segments = localPath === null ? null : parsePath(localPath);
     if (!segments) {
       sendNotFound(response);
       return;

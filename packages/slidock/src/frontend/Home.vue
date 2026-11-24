@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Catalog, CatalogDeck } from '@slidock/slidock/client';
 import type { HubHomeOptions } from './home-options.js';
+import type { VNode } from 'vue';
 import SlidockHome from './SlidockHome.vue';
 defineProps<{
   catalog: Catalog;
@@ -8,6 +9,9 @@ defineProps<{
   homeHref?: string;
   homeLabel?: string;
   deckHref?: (deck: CatalogDeck) => string;
+}>();
+defineSlots<{
+  empty?(props: { reason: 'catalog' | 'filters' }): VNode[];
 }>();
 </script>
 <template>
@@ -29,5 +33,12 @@ defineProps<{
       </section>
     </template>
     <template v-if="home?.footer" #footer>{{ home.footer }}</template>
+    <template #empty="{ reason }">
+      <slot name="empty" :reason="reason">
+        <p class="empty-library">
+          {{ reason === 'filters' ? '条件に一致するスライドがありません。' : 'スライドがありません。' }}
+        </p>
+      </slot>
+    </template>
   </SlidockHome>
 </template>

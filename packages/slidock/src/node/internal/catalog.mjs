@@ -1,5 +1,5 @@
 import { readdir } from 'node:fs/promises';
-import { basename, dirname, extname, relative, resolve, sep } from 'node:path';
+import { basename, dirname, extname, matchesGlob, relative, resolve, sep } from 'node:path';
 
 const excludedDirectories = new Set(['node_modules', 'assets', 'public']);
 const excludedDocuments = new Set(['README.md', 'AGENTS.md']);
@@ -10,8 +10,12 @@ const reserved = /[\u0000-\u001f\u007f\\:?#[\]@!$&'()*+,;=%]/u;
 
 export const encodeDeckPath = (id) => id.split('/').map(encodeURIComponent).join('/');
 
-/** Discover independent Markdown entries without traversing generated assets. */
-export async function discoverDecks(fixturesRoot) {
+/** Discover independent Markdown entries without traversing generated assets.
+ * @param {string} fixturesRoot
+ * @param {{ include?: string[]; exclude?: string[]; allowEmpty?: boolean }} [options]
+ */
+export async function discoverDecks(fixturesRoot, options = {}) {
+  const { include = [], exclude = [], allowEmpty = false } = options;
   const root = resolve(fixturesRoot);
   const discovered = [];
   async function visit(directory) {
@@ -25,6 +29,11 @@ export async function discoverDecks(fixturesRoot) {
         !excludedDocuments.has(entry.name)
       ) {
         const source = relative(root, path).split(sep).join('/');
+        if (
+          (include.length && !include.some((pattern) => matchesGlob(source, pattern))) ||
+          exclude.some((pattern) => matchesGlob(source, pattern))
+        )
+          continue;
         const stem = source.slice(0, -3);
         const id = basename(stem) === 'slides' && dirname(stem) !== '.' ? dirname(stem) : stem;
         if (
@@ -45,7 +54,7 @@ export async function discoverDecks(fixturesRoot) {
   }
   await visit(root);
   discovered.sort((left, right) => compare(left.id, right.id));
-  if (!discovered.length) throw new Error(`No Slidev decks found in ${root}`);
+  if (!discovered.length && !allowEmpty) throw new Error(`No Slidev decks found in ${root}`);
   const byId = new Map();
   for (const deck of discovered) {
     const previous = byId.get(deck.id);

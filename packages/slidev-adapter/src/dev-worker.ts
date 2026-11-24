@@ -10,6 +10,7 @@ const input = JSON.parse(process.argv[2]) as {
   entry: string;
   theme: string;
   base: string;
+  viteCacheDir: string;
 };
 const { api, cliRequire } = await resolveRuntime(input.dependencyRoot);
 const { watch } = await import(pathToFileURL(cliRequire.resolve('chokidar')).href);
@@ -42,6 +43,7 @@ async function start() {
     options,
     {
       base: input.base,
+      cacheDir: input.viteCacheDir,
       server: {
         host: '127.0.0.1',
         port,
@@ -96,13 +98,21 @@ watcher.on('all', (_event: string, file: string) => {
   )
     restart();
 });
-async function close() {
+let closing: Promise<void> | undefined;
+function close() {
+  if (closing) return closing;
   stopping = true;
   clearTimeout(timer);
-  await watcher.close();
-  await restarting;
-  await server?.close();
-  process.disconnect?.();
+  closing = (async () => {
+    try {
+      await watcher.close();
+      await restarting;
+      await server?.close();
+    } finally {
+      process.disconnect?.();
+    }
+  })();
+  return closing;
 }
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => {

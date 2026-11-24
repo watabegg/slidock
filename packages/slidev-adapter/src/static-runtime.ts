@@ -48,6 +48,22 @@ export function patchStaticRuntimeModule({
   const mainFile = join(clientRoot, 'setup/main.ts');
   const envFile = join(clientRoot, 'env.ts');
   const rootFile = join(clientRoot, 'setup/root.ts');
+  const preloadImagesFile = join(clientRoot, 'composables/usePreloadImages.ts');
+
+  if (id === preloadImagesFile) {
+    let transformed = code.replaceAll('import.meta.env.BASE_URL', '__labDeckBase');
+    const baseSignature = "const base = (__labDeckBase || '/').replace(RE_TRAILING_SLASH, '')";
+    if (!code.includes("import.meta.env.BASE_URL || '/'") || !transformed.includes(baseSignature))
+      throw new Error(`Slidev image-base signature changed: ${id}`);
+    transformed = transformed.replace(
+      baseSignature,
+      `if (url.startsWith(__labSiteBase)) return url\n  ${baseSignature}`,
+    );
+    return (
+      `import { deckBase as __labDeckBase, siteBase as __labSiteBase } from '/@lab/selection';\n` +
+      transformed
+    );
+  }
 
   if (id === mainFile || id === envFile) {
     if (!code.includes('import.meta.env.BASE_URL'))

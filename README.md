@@ -41,6 +41,8 @@ pnpm dev:slidock
 
 `dev:slidock` は資料ごとの Slidev 開発サーバーを使います。共通バンドルを生成した結果を確認するには、`pnpm build:slidock` の後に `pnpm preview:slidock` を使います。このデモはテーマごとに互換グループが分かれます。同一テーマの複数資料を使う検証用データは `examples/fixtures/` にあります。
 
+新しい設定ファイルと CLI の使い方は [フレームワーク利用ガイド](docs/guides/framework.md) を参照してください。Vue ホームの自動読み込みと `/slides/` 配信は [追加ガイド](docs/guides/pages-subpath.md) を参照してください。npm への一般公開はまだ行っていません。
+
 自分のサイトへ組み込む場合は [Node API](docs/guides/slidock-service.md) と [Web フロントエンド API](docs/guides/web-customization.md) を参照してください。
 
 ## Slive と CLI の利用

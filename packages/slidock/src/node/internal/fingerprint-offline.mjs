@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, posix, resolve } from 'node:path';
+import { normalizeBasePath, stripBasePath } from './base-path.mjs';
 
 const TEXT_EXTENSIONS = new Set(['.html', '.htm', '.js', '.css', '.json']);
 // Match complete URL/path tokens, including an external URL's scheme, so an
@@ -28,12 +29,30 @@ function isEmittedAsset(path) {
   return path.split('/').slice(0, -1).includes('assets') && /\.(?:js|css)$/i.test(path);
 }
 
-function rewriteReferences(text, sourcePath, assets) {
+function viteRootAsset(sourcePath, reference) {
+  if (!reference.startsWith('assets/')) return null;
+  const sourceSegments = sourcePath.split('/');
+  const assetsIndex = sourceSegments.indexOf('assets');
+  if (assetsIndex < 0) return null;
+  const outputRoot = sourceSegments.slice(0, assetsIndex).join('/');
+  return posix.join(outputRoot, reference);
+}
+
+function rewriteReferences(text, sourcePath, assets, basePath) {
   return text.replace(ASSET_REFERENCE, (reference) => {
     if (reference.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(reference)) return reference;
-    const candidates = reference.startsWith('/')
-      ? [posix.normalize(reference.slice(1))]
-      : [posix.join(posix.dirname(sourcePath), reference), posix.normalize(reference)];
+    let candidates;
+    if (reference.startsWith('/')) {
+      const localPath = stripBasePath(reference, basePath);
+      if (localPath === null) return reference;
+      candidates = [posix.normalize(localPath.slice(1))];
+    } else {
+      candidates = [
+        posix.join(posix.dirname(sourcePath), reference),
+        viteRootAsset(sourcePath, reference),
+        posix.normalize(reference),
+      ].filter(Boolean);
+    }
     // Vite uses module-relative imports and site-relative preload-map entries.
     const source = candidates.find((path) => assets.has(path));
     if (!source) return reference;
@@ -48,12 +67,16 @@ function rewriteReferences(text, sourcePath, assets) {
  * without attempting to hash a potentially cyclic module dependency graph.
  * Run once after all content rewriting, before measuring or serving the site.
  */
-export async function fingerprintOfflineSite(siteRoot) {
+export async function fingerprintOfflineSite(siteRoot, { basePath: requestedBasePath } = {}) {
   if (typeof siteRoot !== 'string' || !isAbsolute(siteRoot)) {
     throw new Error('site root must be an absolute path');
   }
   const root = resolve(siteRoot);
   const files = await readSnapshot(root);
+  const metadata = files.has('manifest.json')
+    ? JSON.parse(files.get('manifest.json').toString('utf8'))
+    : {};
+  const basePath = normalizeBasePath(requestedBasePath ?? metadata.basePath);
   const emittedAssets = [...files.keys()].filter(isEmittedAsset);
   if (emittedAssets.some((path) => /-offline-[a-f0-9]{64}\.(?:js|css)$/i.test(path))) {
     throw new Error(
@@ -86,7 +109,7 @@ export async function fingerprintOfflineSite(siteRoot) {
   for (const [path, bytes] of files) {
     if (!TEXT_EXTENSIONS.has(posix.extname(path).toLowerCase())) continue;
     const text = bytes.toString('utf8');
-    const output = rewriteReferences(text, path, assets);
+    const output = rewriteReferences(text, path, assets, basePath);
     if (output !== text) rewritten.set(path, output);
   }
   for (const [path, text] of rewritten) await writeFile(join(root, path), text);

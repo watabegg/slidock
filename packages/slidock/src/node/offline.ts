@@ -1,5 +1,6 @@
 import { vendorFonts } from './internal/vendor-fonts.mjs';
 import { fingerprintOfflineSite } from './internal/fingerprint-offline.mjs';
+import { normalizeBasePath, withBasePath } from './internal/base-path.mjs';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises';
@@ -8,6 +9,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 export interface PrepareOfflineSiteOptions {
   siteRoot: string;
   workDir: string;
+  basePath?: string;
 }
 
 export interface PrepareOfflineSiteResult {
@@ -64,6 +66,12 @@ export async function prepareOfflineSite(
     throw new Error(`workDir must be outside the site root: ${workDir}`);
   }
 
+  const manifestPath = join(siteRoot, 'manifest.json');
+  const initialManifest = JSON.parse(await readFile(manifestPath, 'utf8')) as OfflineManifest & {
+    basePath?: string;
+  };
+  const basePath = normalizeBasePath(options.basePath ?? initialManifest.basePath);
+
   await vendorFonts({
     siteRoot,
     evidencePath: join(workDir, 'font-vendor.json'),
@@ -73,9 +81,20 @@ export async function prepareOfflineSite(
   const paths = await listFiles(siteRoot);
   for (const path of paths.filter((filePath) => /\.(?:html|js|json)$/.test(filePath))) {
     const text = await readFile(path, 'utf8');
-    if (text.includes(DEFAULT_FAVICON)) {
-      await writeFile(path, text.replaceAll(DEFAULT_FAVICON, '/favicon.svg'));
+    let output = text;
+    if (output.includes(DEFAULT_FAVICON)) {
+      output = output.replaceAll(DEFAULT_FAVICON, withBasePath(basePath, '/favicon.svg'));
       changedFaviconFiles++;
+    }
+    if (basePath !== '/' && output.includes('/_fonts/'))
+      output = output.replaceAll('/_fonts/', withBasePath(basePath, '/_fonts/'));
+    if (output !== text) await writeFile(path, output);
+  }
+  if (basePath !== '/') {
+    for (const path of paths.filter((filePath) => filePath.endsWith('.css'))) {
+      const text = await readFile(path, 'utf8');
+      const output = text.replaceAll('/_fonts/', withBasePath(basePath, '/_fonts/'));
+      if (output !== text) await writeFile(path, output);
     }
   }
   await writeFile(
@@ -83,12 +102,19 @@ export async function prepareOfflineSite(
     await readFile(fileURLToPath(import.meta.resolve('@slidock/slidock/icon.svg'))),
   );
 
-  const manifestPath = join(siteRoot, 'manifest.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as OfflineManifest;
-  manifest.commonAssets = [...new Set([...(manifest.commonAssets || []), 'favicon.svg'])].sort();
+  const commonAssets = [...(manifest.commonAssets || []), 'favicon.svg'];
+  manifest.commonAssets = [
+    ...new Set(
+      commonAssets.map((asset) => {
+        if (basePath === '/' || typeof asset !== 'string') return asset;
+        return asset.startsWith(basePath) ? asset.slice(basePath.length) : asset.replace(/^\//, '');
+      }),
+    ),
+  ].sort();
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-  const fingerprint = await fingerprintOfflineSite(siteRoot);
+  const fingerprint = await fingerprintOfflineSite(siteRoot, { basePath });
   const files: OfflineFileMetric[] = await Promise.all(
     (await listFiles(siteRoot)).map(async (path) => {
       const bytes = await readFile(path);

@@ -6,14 +6,26 @@ import { runStage } from './stage.js';
 
 function help(product: Product): string {
   return product === 'hub'
-    ? 'Usage: slidock <build|check|serve|thumbnail|publish|init|doctor|jobs> [options]'
+    ? 'Usage: slidock <create|dev|build|preview|check|serve|thumbnail|publish|init|doctor|jobs> [options]'
     : 'Usage: slive <prepare|connect|doctor> [options] [origin]';
 }
 
 function splitCommand(product: Product, args: string[]): { command?: string; rest: string[] } {
   const known =
     product === 'hub'
-      ? ['build', 'check', 'serve', 'thumbnail', 'publish', 'init', 'doctor', 'jobs']
+      ? [
+          'create',
+          'dev',
+          'build',
+          'preview',
+          'check',
+          'serve',
+          'thumbnail',
+          'publish',
+          'init',
+          'doctor',
+          'jobs',
+        ]
       : ['prepare', 'connect', 'doctor'];
   if (args.length === 0) return { rest: [] };
   if (['--help', '-h', '--version'].includes(args[0])) return { rest: args };

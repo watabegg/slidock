@@ -1,7 +1,6 @@
 {
   "name": "@slidock/slidev-adapter",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "exports": {
     "./clicks": {
@@ -42,5 +41,14 @@
   ],
   "engines": {
     "node": ">=24.15.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/watabegg/slidock.git",
+    "directory": "packages/slidev-adapter"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

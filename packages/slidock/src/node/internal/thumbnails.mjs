@@ -1,7 +1,7 @@
-import { chromium } from 'playwright-chromium';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, relative, resolve, sep, isAbsolute } from 'node:path';
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { createServer } from './serve.mjs';
+import { normalizeBasePath, stripBasePath, withBasePath } from './base-path.mjs';
 
 const DEFAULT_WIDTH = 1200;
 const DEFAULT_HEIGHT = 675;
@@ -58,9 +58,9 @@ function sameSegments(actual, expected) {
   );
 }
 
-function validateDecks(manifest) {
-  if (!Array.isArray(manifest?.decks) || manifest.decks.length === 0) {
-    throw new Error('manifest.json must contain a non-empty decks array');
+function validateDecks(manifest, { allowEmpty = false, basePath = '/' } = {}) {
+  if (!Array.isArray(manifest?.decks) || (!allowEmpty && manifest.decks.length === 0)) {
+    throw new Error('manifest.json must contain a decks array');
   }
 
   const ids = new Set();
@@ -76,21 +76,23 @@ function validateDecks(manifest) {
     if (typeof deck.entry !== 'string' || !Number.isInteger(deck.pages) || deck.pages < 1) {
       throw new Error(`manifest.json deck ${id} must include an entry and a positive pages count`);
     }
-    const expectedEntry = `/${encodePathSegments(segments)}/1`;
+    const expectedEntry = withBasePath(basePath, `/${encodePathSegments(segments)}/1`);
     let entry;
     try {
       entry = new URL(deck.entry, 'http://slidev-lab.invalid');
     } catch (error) {
       throw new Error(`manifest.json deck ${id} has an invalid entry: ${error.message}`);
     }
+    const localPathname = stripBasePath(entry.pathname, basePath);
     if (
       entry.origin !== 'http://slidev-lab.invalid' ||
-      !sameSegments(decodePathSegments(entry.pathname), [...segments, '1'])
+      localPathname === null ||
+      !sameSegments(decodePathSegments(localPathname), [...segments, '1'])
     ) {
       throw new Error(`manifest.json deck ${id} entry must be ${expectedEntry}`);
     }
 
-    const src = `/thumbnails/${encodePathSegments(segments)}.png`;
+    const src = withBasePath(basePath, `/thumbnails/${encodePathSegments(segments)}.png`);
     if (deck.thumbnail?.src !== undefined && deck.thumbnail.src !== src) {
       throw new Error(`manifest.json deck ${id} thumbnail src must be ${src}`);
     }
@@ -188,7 +190,15 @@ export async function waitForRenderedSlide(page, id) {
   }
 }
 
-async function generateDeckThumbnail({ browser, origin, root, deck, outputWidth, outputHeight }) {
+async function generateDeckThumbnail({
+  browser,
+  origin,
+  root,
+  deck,
+  outputWidth,
+  outputHeight,
+  basePath,
+}) {
   const context = await browser.newContext({
     viewport: { width: outputWidth, height: outputHeight },
   });
@@ -206,7 +216,7 @@ async function generateDeckThumbnail({ browser, origin, root, deck, outputWidth,
     });
 
     const routeSegments = [...deck.segments, '1'];
-    const routePath = `/${encodePathSegments(routeSegments)}`;
+    const routePath = withBasePath(basePath, `/${encodePathSegments(routeSegments)}`);
     const route = new URL(routePath, origin);
     route.searchParams.set('embedded', 'true');
     route.searchParams.set('labThumbnail', 'true');
@@ -219,7 +229,8 @@ async function generateDeckThumbnail({ browser, origin, root, deck, outputWidth,
         `deck ${deck.id} first slide request failed${response ? ` with HTTP ${response.status()}` : ''}`,
       );
     }
-    if (!sameSegments(decodePathSegments(new URL(page.url()).pathname), routeSegments)) {
+    const localPathname = stripBasePath(new URL(page.url()).pathname, basePath);
+    if (!sameSegments(decodePathSegments(localPathname), routeSegments)) {
       throw new Error(`deck ${deck.id} navigated to an unexpected route: ${page.url()}`);
     }
 
@@ -257,7 +268,15 @@ async function generateDeckThumbnail({ browser, origin, root, deck, outputWidth,
     const file = await stat(destination);
     if (file.size !== screenshot.length)
       throw new Error(`deck ${deck.id} thumbnail was not fully written`);
-    return { id: deck.id, src, width: outputWidth, height: outputHeight };
+    return {
+      id: deck.id,
+      src,
+      width: outputWidth,
+      height: outputHeight,
+      asset: join('thumbnails', ...deck.segments.slice(0, -1), `${deck.segments.at(-1)}.png`)
+        .split(sep)
+        .join('/'),
+    };
   } catch (error) {
     throw new Error(`thumbnail generation failed for deck ${deck.id}: ${error.message}`, {
       cause: error,
@@ -267,11 +286,31 @@ async function generateDeckThumbnail({ browser, origin, root, deck, outputWidth,
   }
 }
 
-export async function generateThumbnails({
+const PLACEHOLDER_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"><rect width="1200" height="675" fill="#f1f5f9"/><path d="M0 505 330 255l210 160 170-130 490 350v40H0z" fill="#dbe5ee"/><circle cx="900" cy="170" r="58" fill="#dbe5ee"/></svg>\n';
+
+function imageAsset(deckId, extension) {
+  const segments = deckId.split('/');
+  const last = segments.pop();
+  return join('covers', ...segments, `${last}${extension}`)
+    .split(sep)
+    .join('/');
+}
+
+function assetUrl(asset, basePath) {
+  return withBasePath(basePath, `/${asset.split('/').map(encodeURIComponent).join('/')}`);
+}
+
+/** Prepare every collection thumbnail and launch Chromium only for missing captures. */
+export async function prepareBuildThumbnails({
   siteRoot,
+  mode = 'auto',
+  covers = {},
   outputWidth = DEFAULT_WIDTH,
   outputHeight = DEFAULT_HEIGHT,
   chromiumExecutable,
+  allowEmpty = false,
+  basePath: requestedBasePath,
 } = {}) {
   if (!siteRoot) throw new Error('siteRoot is required');
   if (!isAbsolute(siteRoot)) throw new Error('siteRoot must be an absolute path');
@@ -286,6 +325,7 @@ export async function generateThumbnails({
   if (chromiumExecutable !== undefined && !isAbsolute(chromiumExecutable)) {
     throw new Error('chromiumExecutable must be an absolute path');
   }
+  if (mode !== 'auto' && mode !== 'none') throw new Error('mode must be auto or none');
 
   const root = resolve(siteRoot);
   let manifest;
@@ -296,10 +336,54 @@ export async function generateThumbnails({
       cause: error,
     });
   }
-  const decks = validateDecks(manifest);
-  const server = createServer(root);
-  let browser;
+  const basePath = normalizeBasePath(requestedBasePath ?? manifest.basePath);
+  const decks = validateDecks(manifest, { allowEmpty, basePath });
   const results = [];
+  const captures = [];
+  for (const deck of decks) {
+    const cover = Object.hasOwn(covers, deck.id) ? covers[deck.id] : undefined;
+    if (cover) {
+      const extension = extname(cover).toLowerCase();
+      if (!['.png', '.jpg', '.jpeg', '.webp', '.svg'].includes(extension))
+        throw new Error(`deck ${deck.id} cover must be a PNG, JPEG, WebP, or SVG file`);
+      const asset = imageAsset(deck.id, extension);
+      const destination = resolve(root, asset);
+      if (!isInside(root, destination))
+        throw new Error(`deck ${deck.id} cover path escapes the site root`);
+      await mkdir(dirname(destination), { recursive: true });
+      await copyFile(cover, destination);
+      results.push({
+        id: deck.id,
+        src: assetUrl(asset, basePath),
+        width: outputWidth,
+        height: outputHeight,
+        asset,
+      });
+    } else if (mode === 'none') {
+      const asset = join('thumbnails', ...deck.segments.slice(0, -1), `${deck.segments.at(-1)}.svg`)
+        .split(sep)
+        .join('/');
+      const destination = resolve(root, asset);
+      if (!isInside(root, destination))
+        throw new Error(`deck ${deck.id} thumbnail path escapes the site root`);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, PLACEHOLDER_SVG);
+      results.push({
+        id: deck.id,
+        src: assetUrl(asset, basePath),
+        width: outputWidth,
+        height: outputHeight,
+        asset,
+      });
+    } else {
+      captures.push(deck);
+    }
+  }
+  if (!captures.length) return results;
+
+  const { chromium } = await import('playwright-core');
+  const server = createServer(root, { basePath });
+  let browser;
 
   try {
     await new Promise((resolveListen, rejectListen) => {
@@ -320,9 +404,17 @@ export async function generateThumbnails({
       ...(chromiumExecutable ? { executablePath: chromiumExecutable } : {}),
     });
 
-    for (const deck of decks) {
+    for (const deck of captures) {
       results.push(
-        await generateDeckThumbnail({ browser, origin, root, deck, outputWidth, outputHeight }),
+        await generateDeckThumbnail({
+          browser,
+          origin,
+          root,
+          deck,
+          outputWidth,
+          outputHeight,
+          basePath,
+        }),
       );
     }
     return results;
@@ -330,4 +422,9 @@ export async function generateThumbnails({
     await closeQuietly(browser);
     await closeServer(server);
   }
+}
+
+export async function generateThumbnails(options = {}) {
+  const results = await prepareBuildThumbnails(options);
+  return results.map(({ asset: _asset, ...thumbnail }) => thumbnail);
 }

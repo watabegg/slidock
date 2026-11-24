@@ -7,10 +7,16 @@ import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { categoriesForDecks } from './catalog.mjs';
 import { buildGraph } from './graph.mjs';
+import { buildEmptyCollection } from './empty.mjs';
+import { injectHomeConfig } from './home-config.mjs';
+import { normalizeBasePath, withBasePath } from './base-path.mjs';
+import { makeNativeUnsupportedForSubpath } from './native-base-path.mjs';
 
 const jobScript = fileURLToPath(new URL('./job.mjs', import.meta.url));
 const probeScript = fileURLToPath(new URL('./profile-probe.mjs', import.meta.url));
 const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+const compareDecks = (left, right) =>
+  (left.order ?? 0) - (right.order ?? 0) || compare(left.id, right.id);
 
 function requireAbsolute(value, name) {
   if (typeof value !== 'string' || !isAbsolute(value))
@@ -110,10 +116,12 @@ async function buildProfiles(job) {
   const started = performance.now();
   const sourceRoot = resolve(job.sourceRoot);
   const workDir = resolve(job.workDir);
+  const basePath = normalizeBasePath(job.basePath);
   await mkdir(workDir, { recursive: true });
   const jobs = await mkdtemp(join(workDir, '.profile-jobs-'));
   try {
-    const decks = [...job.decks].sort((left, right) => compare(left.id, right.id));
+    const decks = [...job.decks].sort(compareDecks);
+    const orderById = new Map(decks.map((deck) => [deck.id, deck.order ?? 0]));
     const groups = new Map();
     for (const [index, deck] of decks.entries()) {
       const profile = job.profiles[deck.profile];
@@ -159,6 +167,8 @@ async function buildProfiles(job) {
         frontendRoot: job.frontendRoot,
         frontendEntry: job.frontendEntry,
         navigation: job.navigation,
+        home: job.home,
+        basePath,
         offline: job.offline,
         chromiumExecutable: job.chromiumExecutable,
         bootstrap: 'sync',
@@ -168,7 +178,7 @@ async function buildProfiles(job) {
           decks: group.decks,
           assignments: group.assignments,
           compile: group.contract.compile,
-          assetBase: `/_profiles/${group.id}/`,
+          assetBase: withBasePath(basePath, `_profiles/${group.id}/`),
         },
       };
       const jobFile = join(jobs, `${group.id}.json`);
@@ -205,17 +215,25 @@ async function buildProfiles(job) {
         theme: group.theme,
         profiles: [...new Set(Object.values(group.assignments))],
         decks: group.decks.map((deck) => deck.id),
-        assetBase: `/${prefix}/`,
+        assetBase: withBasePath(basePath, `${prefix}/`),
         compatibility: group.signature,
       });
       console.log(
         `Built ${group.id}: Slidev ${group.runtimeVersion}, ${group.theme}, ${group.decks.length} decks`,
       );
     }
-    allDecks.sort((left, right) => compare(left.id, right.id));
+    allDecks.sort(
+      (left, right) =>
+        (orderById.get(left.id) ?? 0) - (orderById.get(right.id) ?? 0) ||
+        compare(left.id, right.id),
+    );
     nativePlayer.decks.sort((left, right) => compare(left.id, right.id));
     nativePlayer.unsupportedDecks.sort((left, right) => compare(left.id, right.id));
-    await writeFile(join(site, 'native-player.json'), JSON.stringify(nativePlayer, null, 2) + '\n');
+    const outputNativePlayer = makeNativeUnsupportedForSubpath(nativePlayer, allDecks, basePath);
+    await writeFile(
+      join(site, 'native-player.json'),
+      JSON.stringify(outputNativePlayer, null, 2) + '\n',
+    );
     const versions = [...new Set(allDecks.map((deck) => deck.runtimeVersion))];
     const manifest = {
       schemaVersion: 1,
@@ -227,6 +245,7 @@ async function buildProfiles(job) {
       groups: groupDescriptions,
       commonAssets: [],
       decks: allDecks,
+      ...(basePath === '/' ? {} : { basePath }),
     };
     const catalog = {
       schemaVersion: 1,
@@ -259,7 +278,7 @@ async function buildProfiles(job) {
         }),
       ),
     };
-    await writeFile(join(site, 'index.html'), homeHtml);
+    await writeFile(join(site, 'index.html'), injectHomeConfig(homeHtml, job.home));
     await writeFile(join(site, '404.html'), homeHtml);
     await writeFile(join(site, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
     await writeFile(join(site, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
@@ -293,7 +312,7 @@ async function buildProfiles(job) {
         ...Object.fromEntries(Object.entries(metrics).filter(([key]) => key !== 'files')),
       }),
     );
-    return { site, manifest, catalog, nativePlayer, metrics };
+    return { site, manifest, catalog, nativePlayer: outputNativePlayer, metrics };
   } finally {
     await rm(jobs, { recursive: true, force: true });
   }
@@ -303,6 +322,10 @@ export async function buildEngine(job) {
   if (job?.kind !== 'build' && job?.kind !== 'group')
     throw new Error(`Unsupported Hub build job kind: ${job?.kind}`);
   validateCoreJob(job);
+  if (job.kind === 'build' && Array.isArray(job.decks) && job.decks.length === 0) {
+    if (!job.allowEmpty) throw new Error('An empty deck collection requires allowEmpty: true');
+    return buildEmptyCollection(job);
+  }
   if (job?.kind === 'group') {
     if (!job.group?.profile || !Array.isArray(job.group.decks) || !job.group.compile)
       throw new Error('Group job requires group.profile, group.decks, and group.compile');

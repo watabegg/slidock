@@ -9,6 +9,9 @@
 - [ ] オブジェクトストレージへの直接配置を公開ジョブへ接続するイベントアダプターを検討
 - [ ] Slidock の標準 Web コンポーネントと Slive の UI・UX を改善
 - [ ] AWS（ECS、S3、PostgreSQL）および GCP（Cloud Run、GCS、PostgreSQL）の実環境における受け入れ検証
+- [ ] npm スコープの権限を確認し、準備済みのフレームワーク alpha パッケージを公開
+- [ ] フレームワークの macOS / Windows 受け入れ検証
+- [ ] Slive のサブパス配信対応（Web は対応済み、ネイティブは `/` のみ）
 - [ ] npm パッケージおよびサーバー成果物の正式な配布への対応
 
 実装済み機能の検証範囲は [検証記録](docs/results/README.md)、完了済み計画は [アーカイブ](docs/archive/README.md) を参照。

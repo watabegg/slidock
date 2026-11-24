@@ -4,6 +4,14 @@ import { resolve, dirname, relative, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
+import { injectHomeConfig, injectSiteBase } from './home-config.mjs';
+import { normalizeBasePath, withBasePath } from './base-path.mjs';
+import {
+  createFrontendEntryPlugin,
+  frontendEntryId,
+  frontendEntryResolvedId,
+  resolveFrontendVue,
+} from './frontend-entry.mjs';
 import {
   categoriesForDecks,
   discoverDecks,
@@ -13,6 +21,7 @@ import {
 import { compileContract, stableJson } from './profile-contract.mjs';
 import { loadSlidevParser, resolveRuntime } from '@slidock/slidev-adapter/runtime';
 import { nativePlayerManifest } from '@slidock/slidev-adapter/native-manifest';
+import { makeNativeUnsupportedForSubpath } from './native-base-path.mjs';
 import {
   patchSlidevHtmlEntry,
   patchSlidevImageFrontmatter,
@@ -26,7 +35,8 @@ export async function buildGraph(job) {
   const workDir = resolve(job.workDir);
   const frontendRoot = resolve(job.frontendRoot);
   const frontendEntry = resolve(job.frontendEntry ?? join(frontendRoot, 'home.ts'));
-  const frontendModules = new Set([frontendEntry]);
+  const basePath = normalizeBasePath(job.basePath);
+  const frontendModules = new Set([frontendEntry, frontendEntryId, frontendEntryResolvedId]);
   const theme = resolve(groupJob?.profile.theme || job.theme);
   const dependencyRoot = resolve(groupJob?.profile.dependencyRoot || job.dependencyRoot);
   const syncBootstrap = job.bootstrap !== 'tla';
@@ -41,7 +51,8 @@ export async function buildGraph(job) {
   const discovered = groupJob?.decks || job.decks || (await discoverDecks(sourceRoot));
   const themePackage = JSON.parse(await readFile(join(theme, 'package.json'), 'utf8'));
   const publicTheme = `${themePackage.name}@${themePackage.version}`;
-  const assetBase = groupJob?.assetBase || '/';
+  const assetBase = groupJob?.assetBase || basePath;
+  const homeHref = job.navigation?.homeHref ?? basePath;
   const ids = discovered.map((deck) => deck.id);
   const started = performance.now();
   const decks = [];
@@ -53,7 +64,8 @@ export async function buildGraph(job) {
     return typeof result === 'string' ? result : result?.code;
   }
   const scopedNames = new Set(['slidev:loader', 'unplugin-vue-markdown', 'slidev:layout-wrapper']);
-  for (const { id, entry, categoryPath } of discovered) {
+  for (const sourceDeck of discovered) {
+    const { id, entry, categoryPath } = sourceDeck;
     const options = await resolveOptions(
       { entry, theme, withoutNotes: true, routerMode: 'history' },
       'build',
@@ -64,7 +76,13 @@ export async function buildGraph(job) {
     const themeConfig = options.data.config.themeConfig || {};
     options.data.config.themeConfig = {
       ...themeConfig,
-      watabegg: { ...themeConfig.watabegg, navigation: { href: '/', label: 'ホームへ戻る' } },
+      watabegg: {
+        ...themeConfig.watabegg,
+        navigation: {
+          href: homeHref,
+          label: job.navigation?.homeLabel ?? 'ホームへ戻る',
+        },
+      },
     };
     for (const slide of options.data.slides) stripPrivateSlideData(slide);
     // Upstream persists generated import-glob modules below userRoot. Keep
@@ -80,6 +98,8 @@ export async function buildGraph(job) {
     decks.push({
       id,
       categoryPath,
+      title: sourceDeck.title,
+      order: sourceDeck.order ?? 0,
       frontmatter,
       options,
       plugins,
@@ -119,9 +139,11 @@ export async function buildGraph(job) {
     `const loaders = ${deckImports(name)};\nconst value = await loaders[deckId]();\n`;
   const selectionCode = `
 export const deckIds = ${JSON.stringify(ids)};
-const pathname = location.pathname.split('/').map(segment => decodeURIComponent(segment)).join('/');
+export const siteBase = ${JSON.stringify(basePath)};
+const mountedPathname = location.pathname.startsWith(siteBase) ? '/' + location.pathname.slice(siteBase.length) : location.pathname;
+const pathname = mountedPathname.split('/').map(segment => decodeURIComponent(segment)).join('/');
 export const deckId = [...deckIds].sort((a, b) => b.length - a.length).find(id => pathname.startsWith('/' + id + '/'));
-export const deckBase = deckId ? '/' + deckId.split('/').map(encodeURIComponent).join('/') + '/' : '/';
+export const deckBase = deckId ? siteBase + deckId.split('/').map(encodeURIComponent).join('/') + '/' : siteBase;
 `;
   const adapter = {
     name: 'lab:independent-decks',
@@ -166,7 +188,7 @@ else {`
 } else {`
 }
   document.title = 'Slidock';
-  import(${JSON.stringify(frontendEntry)}).catch(showStartupError);
+  import(${JSON.stringify(frontendEntryId)}).catch(showStartupError);
 }
 `;
       if (id === '/@slidev/configs')
@@ -275,6 +297,13 @@ else {`
     '<head>',
     `<head><script>if(window.parent!==window && new URLSearchParams(location.search).get('nativeProtocol')==='1'){${nativeBridge}}</script>`,
   );
+  const frontendEntryPlugin = createFrontendEntryPlugin(() => ({ frontendEntry, frontendRoot }));
+  let vueEntry;
+  try {
+    vueEntry = cliRequire.resolve('vue/dist/vue.runtime.esm-bundler.js');
+  } catch {
+    vueEntry = resolveFrontendVue(frontendEntry);
+  }
   const viteRoot = join(workDir, 'vite-root');
   await mkdir(workDir, { recursive: true });
   await mkdir(viteRoot, { recursive: true });
@@ -285,9 +314,10 @@ else {`
     cacheDir: join(workDir, 'vite-cache'),
     base: assetBase,
     publicDir: false,
-    plugins: [adapter, ...scoped, ...common, graphPlugin],
+    plugins: [frontendEntryPlugin, adapter, ...scoped, ...common, graphPlugin],
     build: { outDir, emptyOutDir: true, target: 'esnext', cssCodeSplit: true },
     define: { __VUE_PROD_DEVTOOLS__: false },
+    resolve: { alias: [{ find: /^vue$/, replacement: vueEntry }] },
     server: {
       fs: {
         allow: [
@@ -328,9 +358,9 @@ else {`
       runtimeVersion: cliVersion,
       theme: publicTheme,
       profile: groupJob?.assignments[deck.id] || 'default',
-      title: deck.options.data.config.title,
+      title: deck.title ?? deck.options.data.config.title,
       sourcePath: relative(sourceRoot, deck.options.entry),
-      entry: `/${encodeDeckPath(deck.id)}/1`,
+      entry: withBasePath(basePath, `/${encodeDeckPath(deck.id)}/1`),
       pages: deck.options.data.slides.length,
       assets: deckAssets.get(deck.id),
       revision: createHash('sha256')
@@ -345,8 +375,13 @@ else {`
         .digest('hex'),
       categoryPath: deck.categoryPath,
       frontmatter: deck.frontmatter,
-      thumbnail: { src: `/thumbnails/${encodeDeckPath(deck.id)}.png`, width: 1200, height: 675 },
+      thumbnail: {
+        src: withBasePath(basePath, `/thumbnails/${encodeDeckPath(deck.id)}.png`),
+        width: 1200,
+        height: 675,
+      },
     })),
+    ...(basePath === '/' ? {} : { basePath }),
   };
   if (!groupJob) {
     for (const deck of manifest.decks) {
@@ -389,12 +424,24 @@ else {`
   const { parseSync } = await loadSlidevParser(dependencyRoot);
   await writeFile(
     join(outDir, 'native-player.json'),
-    JSON.stringify(await nativePlayerManifest(manifest.decks, sourceRoot, parseSync), null, 2) +
-      '\n',
+    JSON.stringify(
+      makeNativeUnsupportedForSubpath(
+        await nativePlayerManifest(manifest.decks, sourceRoot, parseSync),
+        manifest.decks,
+        basePath,
+      ),
+      null,
+      2,
+    ) + '\n',
   );
   await writeFile(join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   await writeFile(join(outDir, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
-  await writeFile(join(outDir, '404.html'), await readFile(join(outDir, 'index.html')));
+  const homeHtml = injectSiteBase(await readFile(join(outDir, 'index.html'), 'utf8'), basePath);
+  await writeFile(join(outDir, 'index.html'), homeHtml);
+  await writeFile(join(outDir, '404.html'), homeHtml);
+  if (!groupJob && job.home !== undefined) {
+    await writeFile(join(outDir, 'index.html'), injectHomeConfig(homeHtml, job.home));
+  }
   await writeFile(
     join(artifactRoot, 'chunk-graph.json'),
     JSON.stringify(chunkGraph, null, 2) + '\n',

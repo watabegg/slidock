@@ -1,3 +1,5 @@
+import { getSiteBasePath } from '@slidock/slidock/client';
+
 export interface MountNavigationOptions {
   homeHref?: string;
   homeLabel?: string;
@@ -23,7 +25,7 @@ export function mountNavigation(options: MountNavigationOptions = {}): () => voi
   if (!embedded && options.enabled !== false) {
     link = document.createElement('a');
     link.className = 'slide-library-home';
-    link.href = options.homeHref ?? '/';
+    link.href = options.homeHref ?? getSiteBasePath();
     link.textContent = options.homeLabel ?? '← ホームへ戻る';
     link.setAttribute('aria-label', options.homeLabel ?? 'ホームへ戻る');
     document.body.append(link);

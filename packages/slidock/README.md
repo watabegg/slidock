@@ -6,13 +6,16 @@
 
 | import 元 | 用途 |
 | --- | --- |
-| `@slidock/slidock`（`/node` 別名） | `buildHub`、`devHub`、設定の正規化、サムネイル生成 |
+| `@slidock/slidock`（`/node` 別名） | `defineConfig`、`loadProject`、`buildHub`、`devHub`、設定の正規化、サムネイル生成 |
 | `@slidock/slidock/serve` | 静的成果物のローカル配信 |
 | `@slidock/slidock/client` | カタログ取得、公開ジョブの状態取得 |
 | `@slidock/slidock/frontend` | `SlidockHome`、`SlideCard`、`CategoryNav`、`useCatalog`、互換マウント API |
-| `@slidock/slidock/frontend/style.css` | 標準画面のスタイル（明示 import） |
+| `@slidock/slidock/frontend/style.css` | コンポーネントのスタイル（明示 import） |
+| `@slidock/slidock/frontend/site.css` | ページ全体のリセット（任意 import） |
 | `@slidock/slidock/frontend/job-status.css` | 公開ジョブ画面のスタイル |
 | `@slidock/slidock/icon.svg` | Slidock アイコン |
+
+新しい設定と `create` / `dev` / `build` / `preview` / `check` の使い方は [フレームワーク利用ガイド](https://github.com/watabegg/slidock/blob/main/docs/guides/framework.md) を参照してください。ライセンスは [MIT](LICENSE) です。
 
 利用方法は [Node API](../../docs/guides/slidock-service.md)、[Web フロントエンド API](../../docs/guides/web-customization.md)、[公開ジョブ](../../docs/guides/publication-jobs.md) を参照してください。npm への一般公開は未実施です。
 

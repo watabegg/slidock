@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-20",
+  "baseCommit": "d685290ca20d41da85ed1e4fe25e407f8ad4b1a6",
+  "scope": "Automatic pages/index.vue home and standalone Web basePath mounting; uncommitted working tree",
+  "status": "passed",
+  "checks": {
+    "pnpm check": {
+      "status": "passed",
+      "tests": 410,
+      "pass": 401,
+      "fail": 0,
+      "skipped": 9,
+      "evidence": "artifacts/pages-subpath/check.log",
+      "note": "Database integration tests skipped without configured database. Final navigation import change also passed scoped typecheck, lint and formatter."
+    },
+    "root dev browser": {
+      "status": "passed",
+      "checks": 14,
+      "evidence": "artifacts/pages-subpath/root-dev.log"
+    },
+    "frontend browser": {
+      "status": "passed",
+      "evidence": "artifacts/pages-subpath/frontend.log",
+      "note": "Home config, filters, sorting, slots, CSS isolation, refresh state, empty states and metadata rendering"
+    },
+    "subpath dev browser": {
+      "status": "passed",
+      "checks": 7,
+      "evidence": "artifacts/pages-subpath/dev-browser.log"
+    },
+    "static subpath browser": {
+      "status": "passed",
+      "checks": 4,
+      "evidence": "artifacts/pages-subpath/static-browser.json",
+      "screenshot": "artifacts/pages-subpath/custom-home.png",
+      "details": "Nested /docs/slides/, Vue reactive page, offline fingerprinting, two compatibility groups across three decks, encoded deck IDs, deep refresh, home navigation, auto thumbnails, SVG cover and empty home; zero page errors and failed responses"
+    },
+    "adapter and subpath regressions": {
+      "status": "passed",
+      "adapterTests": 12,
+      "subpathTests": 5,
+      "details": "Slidev 52 and 53; mounted image preloading and grouped offline preload maps"
+    },
+    "packed npm and pnpm consumers": {
+      "status": "passed",
+      "command": "CHROMIUM_EXECUTABLE=/usr/bin/google-chrome node scripts/verify-packed-framework.mjs",
+      "releaseSetHash": "cbed0855c639dffb7a89c4824c8f5ec14b31debc3fcc1a1acb7e7a199fc0487a",
+      "evidence": "artifacts/framework-v01/consumer/cbed0855c639dffb7a89c4824c8f5ec14b31debc3fcc1a1acb7e7a199fc0487a/verification-report.json",
+      "details": "npm default root home; pnpm pages/index.vue and /slides/ mount with only @slidock/slidock as direct dependency; create/check/build/preview/dev, shared Vue assets and external Vue source consumer typecheck/build passed"
+    }
+  },
+  "limitations": [
+    "Subpath deployments are Web-only; Slive retains root-only playback contract.",
+    "Public npm publication, cloud deployment, Windows/macOS and native display validation were not performed."
+  ],
+  "documentation": "docs/guides/pages-subpath.md",
+  "fixesVerified": [
+    "Avoid duplicate mount prefixes in Slidev image preloading.",
+    "Fingerprint profile-relative Vite preload-map references.",
+    "Use public client export from navigation so packed installs do not reference unshipped client source."
+  ]
+}
