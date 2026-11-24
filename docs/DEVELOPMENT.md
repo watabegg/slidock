@@ -109,10 +109,10 @@ HUB_ALLOW_LOCAL_MUTATIONS=true HUB_JOBS_ENABLED=true pnpm dev:server
 - `pnpm check`: リント、フォーマット、型検査、テスト、パッケージ境界検証を実施。
 - `pnpm verify:server`: Node アプリ、ブラウザ、CLI の E2E 検証（`HUB_TEST_DATABASE_URL` 設定時に PostgreSQL を使用したアプリ再起動後の復元検証を実行、未設定時は DB 検査をスキップ）。
 - `pnpm verify:packed-server`: ワークスペース外での独立8パッケージ導入と HTTP 配信検証。
-- `pnpm verify:publication-jobs`: Node/PostgreSQL とローカル Workers の公開ジョブフローを検証します。Chromium と専用の使い捨て PostgreSQL が必要です。`HUB_TEST_DATABASE_URL` には他用途と共有しないローカルテスト DB を指定してください。
+- `pnpm verify:publication-jobs`: Node/PostgreSQL とローカル Workers の公開ジョブフローを検証します。Chromium と専用の使い捨て PostgreSQL が必要です。`HUB_TEST_DATABASE_URL` には他用途と共有しないローカルテスト DB を指定してください。誤接続を防ぐため、検証スクリプトは `127.0.0.1:55461` の `hub_jobs` だけを受け付けます。
 
 ```bash
-export HUB_TEST_DATABASE_URL='postgres://USER:PASSWORD@127.0.0.1:5432/hub_jobs'
+export HUB_TEST_DATABASE_URL='postgres://USER:PASSWORD@127.0.0.1:55461/hub_jobs'
 pnpm check
 pnpm verify:server
 pnpm verify:publication-jobs

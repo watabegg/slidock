@@ -18,6 +18,18 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U hub -d hub"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      # verify:publication-jobs only accepts a disposable database at 127.0.0.1:55461/hub_jobs.
+      postgres-jobs:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: hub
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: hub_jobs
+        ports:
+          - 55461:5432
+        options: >-
+          --health-cmd "pg_isready -U hub -d hub_jobs"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       HUB_TEST_DATABASE_URL: postgres://hub:local-test-only@127.0.0.1:5432/hub
     steps:
@@ -34,6 +46,8 @@ jobs:
       - run: pnpm verify:packed-server
       - run: pnpm verify:server
       - run: pnpm verify:publication-jobs
+        env:
+          HUB_TEST_DATABASE_URL: postgres://hub:local-test-only@127.0.0.1:55461/hub_jobs
   framework:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
