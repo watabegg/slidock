@@ -2,7 +2,12 @@ import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Server } from 'node:http';
 import { resolveRuntime } from './runtime.js';
-import { compileContract, stableJson } from './static-runtime.js';
+import {
+  compileContract,
+  patchSlidevImageImports,
+  stableJson,
+  stripSlidevImagePreloads,
+} from './static-runtime.js';
 
 // Each deck gets its own compiler process so theme/setup state cannot cross decks.
 const input = JSON.parse(process.argv[2]) as {
@@ -17,7 +22,15 @@ const { watch } = await import(pathToFileURL(cliRequire.resolve('chokidar')).hre
 if (typeof api.createServer !== 'function')
   throw new Error('Slidev createServer API is unavailable');
 type Options = Parameters<typeof compileContract>[0] & {
-  data: Parameters<typeof compileContract>[0]['data'] & { slides: unknown[] };
+  utils: { indexHtml: string };
+  data: Parameters<typeof compileContract>[0]['data'] & {
+    headmatter: { defaults?: Record<string, unknown> };
+    slides: {
+      frontmatter: Record<string, unknown>;
+      images?: string[];
+      source: { filepath: string; images?: string[] };
+    }[];
+  };
 };
 type DevServer = { listen(): Promise<void>; close(): Promise<void>; httpServer: Server };
 const createServer = api.createServer as (
@@ -38,12 +51,41 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let restarting = Promise.resolve();
 async function start() {
   const options = (await api.resolveOptions(entryOptions, 'dev')) as Options;
+  let data = options.data;
+  // Slidev serves this HTML directly, bypassing Vite's transformIndexHtml hooks.
+  let indexHtml = options.utils.indexHtml;
+  Object.defineProperty(options.utils, 'indexHtml', {
+    configurable: true,
+    enumerable: true,
+    get: () => stripSlidevImagePreloads(indexHtml),
+    set: (html: string) => {
+      indexHtml = html;
+    },
+  });
   const signature = stableJson(compileContract(options));
   server = await createServer(
     options,
     {
       base: input.base,
       cacheDir: input.viteCacheDir,
+      plugins: [
+        {
+          name: 'slidock:relative-images',
+          enforce: 'pre',
+          transform(code: string, id: string) {
+            const match = id.match(/__slidev_(\d+)\.frontmatter$/u);
+            if (!match) return;
+            const slide = data.slides[+match[1] - 1];
+            return patchSlidevImageImports(
+              code,
+              id,
+              slide.source.filepath,
+              { ...data.headmatter.defaults, ...slide.frontmatter },
+              slide.images || slide.source.images || [],
+            );
+          },
+        },
+      ],
       server: {
         host: '127.0.0.1',
         port,
@@ -61,7 +103,8 @@ async function start() {
           restart();
           return false;
         }
-        return next.data;
+        data = next.data;
+        return data;
       },
     },
   );

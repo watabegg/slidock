@@ -1,0 +1,220 @@
+{
+  "date": "2026-11-24",
+  "baseCommit": "39c00ea798d6c7f2fa279c9154c5976a08521d97",
+  "scope": "公式テーマのローカル画像と、静的ビルド・開発ランタイムの frontmatter 相対画像。未コミット差分。",
+  "status": "required-checks-passed-portable-blocked-by-existing-failure",
+  "files": [
+    "docs/DECISIONS.md",
+    "docs/results/README.md",
+    "docs/results/relative-frontmatter-images.json",
+    "examples/official-themes/README.md",
+    "examples/official-themes/slides/Apple Basic/example.md",
+    "examples/official-themes/slides/Default/example.md",
+    "examples/official-themes/slides/Seriph/example.md",
+    "examples/official-themes/slides/assets/abstract-background.svg",
+    "examples/official-themes/sources.json",
+    "packages/slidev-adapter/src/dev-worker.ts",
+    "packages/slidev-adapter/src/static-runtime.ts",
+    "packages/slidev-adapter/tests/static-runtime.test.mjs",
+    "packages/slidock/src/node/internal/graph.mjs",
+    "packages/slidock/tests/relative-images.test.mjs"
+  ],
+  "image": {
+    "path": "examples/official-themes/slides/assets/abstract-background.svg",
+    "bytes": 1052,
+    "license": "MIT",
+    "replacedReferences": 13
+  },
+  "commands": [
+    {
+      "command": "pnpm check",
+      "exitCode": 0,
+      "seconds": 107.1,
+      "log": "artifacts/local-images/check-final.log"
+    },
+    {
+      "command": "pnpm test:slidock-service",
+      "exitCode": 0,
+      "seconds": 44.4,
+      "log": "artifacts/local-images/service-final.log"
+    },
+    {
+      "command": "pnpm build:slidock",
+      "exitCode": 0,
+      "seconds": 36.8,
+      "log": "artifacts/local-images/build-final.log"
+    },
+    {
+      "command": "node artifacts/local-images/inspect-after.mjs",
+      "exitCode": 0,
+      "seconds": 1.6,
+      "log": "artifacts/local-images/inspect-final.log"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "log": "artifacts/local-images/lint-final.log"
+    },
+    {
+      "command": "pnpm format:check",
+      "exitCode": 0,
+      "log": "artifacts/local-images/format-final.log"
+    },
+    {
+      "command": "pnpm verify:pages",
+      "exitCode": 0,
+      "log": "artifacts/local-images/pages-final.log"
+    },
+    {
+      "command": "pnpm verify:slidock",
+      "exitCode": 0,
+      "log": "artifacts/local-images/official-themes-final.log"
+    },
+    {
+      "command": "pnpm verify:portable",
+      "exitCode": 1,
+      "log": "artifacts/local-images/portable-final.log"
+    },
+    {
+      "command": "node --test packages/slidock/tests/relative-images.test.mjs packages/slidev-adapter/tests/static-runtime.test.mjs",
+      "exitCode": 0,
+      "log": "artifacts/local-images/relative-images-final.log"
+    },
+    {
+      "command": "node artifacts/local-images/dev-after.mjs",
+      "exitCode": 0,
+      "log": "artifacts/local-images/dev-after.log"
+    },
+    {
+      "command": "grep -rn \"source.unsplash\" examples/",
+      "exitCode": 1,
+      "matches": 0
+    }
+  ],
+  "rootCheckTotals": {
+    "tests": 415,
+    "pass": 406,
+    "fail": 0,
+    "skipped": 9
+  },
+  "regressions": [
+    "Slidev 52・53 の共通バンドルで /docs/slides/ 配信",
+    "空白を含む資料IDと、資料ごとの同名画像",
+    "background・image・imageLeft・imageTopRight・imageBottomRight と defaults",
+    "相対画像URL変更時のHMRとHTML先読みリンクの404防止",
+    "外部URL・ルート相対URL・画像以外の値の保持"
+  ],
+  "browser": {
+    "checks": [
+      {
+        "theme": "Default",
+        "no": 1,
+        "backgrounds": [
+          "linear-gradient(rgba(0, 0, 0, 0.333), rgba(0, 0, 0, 0.533)), url(\"http://127.0.0.1:35195/_profiles/g-cc106dd27f71e74f/assets/abstract-background-CCO68Ia1.svg\")"
+        ],
+        "screenshot": "artifacts/local-images/default-1-after.png"
+      },
+      {
+        "theme": "Apple Basic",
+        "no": 11,
+        "backgrounds": [
+          "url(\"http://127.0.0.1:35195/_profiles/g-b54fada49a8b0d61/assets/abstract-background-CCO68Ia1.svg\")",
+          "url(\"http://127.0.0.1:35195/_profiles/g-b54fada49a8b0d61/assets/abstract-background-CCO68Ia1.svg\")",
+          "url(\"http://127.0.0.1:35195/_profiles/g-b54fada49a8b0d61/assets/abstract-background-CCO68Ia1.svg\")"
+        ],
+        "screenshot": "artifacts/local-images/apple-basic-11-after.png"
+      },
+      {
+        "theme": "Seriph",
+        "no": 3,
+        "backgrounds": [
+          "url(\"http://127.0.0.1:35195/_profiles/g-12d64cf570b670e8/assets/abstract-background-CCO68Ia1.svg\")"
+        ],
+        "screenshot": "artifacts/local-images/seriph-3-after.png"
+      }
+    ],
+    "failures": []
+  },
+  "developmentBrowser": {
+    "checks": [
+      {
+        "theme": "Default",
+        "no": 1,
+        "backgrounds": [
+          "linear-gradient(rgba(0, 0, 0, 0.333), rgba(0, 0, 0, 0.533)), url(\"http://127.0.0.1:44673/docs/slides/Default/example/@fs/home/watabegg/slidock/examples/official-themes/slides/assets/abstract-background.svg?no-inline\")"
+        ],
+        "screenshot": "artifacts/local-images/default-1-dev-after.png"
+      },
+      {
+        "theme": "Apple Basic",
+        "no": 11,
+        "backgrounds": [
+          "url(\"http://127.0.0.1:44673/docs/slides/Apple%20Basic/example/@fs/home/watabegg/slidock/examples/official-themes/slides/assets/abstract-background.svg?no-inline\")",
+          "url(\"http://127.0.0.1:44673/docs/slides/Apple%20Basic/example/@fs/home/watabegg/slidock/examples/official-themes/slides/assets/abstract-background.svg?no-inline\")",
+          "url(\"http://127.0.0.1:44673/docs/slides/Apple%20Basic/example/@fs/home/watabegg/slidock/examples/official-themes/slides/assets/abstract-background.svg?no-inline\")"
+        ],
+        "screenshot": "artifacts/local-images/apple-basic-11-dev-after.png"
+      },
+      {
+        "theme": "Seriph",
+        "no": 3,
+        "backgrounds": [
+          "url(\"http://127.0.0.1:44673/docs/slides/Seriph/example/@fs/home/watabegg/slidock/examples/official-themes/slides/assets/abstract-background.svg?no-inline\")"
+        ],
+        "screenshot": "artifacts/local-images/seriph-3-dev-after.png"
+      }
+    ],
+    "failures": [
+      {
+        "url": "http://127.0.0.1:44673/@server-reactive/nav",
+        "status": 404
+      },
+      {
+        "url": "http://127.0.0.1:44673/@server-reactive/nav",
+        "status": 404
+      },
+      {
+        "url": "http://127.0.0.1:44673/@server-reactive/nav",
+        "status": 404
+      }
+    ]
+  },
+  "visuallyInspected": [
+    "artifacts/local-images/default-1-after.png",
+    "artifacts/local-images/apple-basic-11-after.png"
+  ],
+  "limitations": [
+    {
+      "scope": "pnpm verify:portable",
+      "detail": "型検査・全テスト・公式テーマビルド・verify:slidock は成功。verify:web-customization の scripts/verify-web-customization.mjs:163 で body の背景色が透明となり停止。期待値 rgb(255, 248, 238)、実測 rgba(0, 0, 0, 0)。",
+      "baseline": "HEAD の graph.mjs と static-runtime.ts から生成したビルド処理でも同じ失敗を再現。調査後に最終版の生成物を復元。",
+      "evidence": "artifacts/local-images/web-customization-baseline.log",
+      "unexecutedAfterFailure": [
+        "build:slidock:fixtures",
+        "verify:slidock:fixtures",
+        "slive:prepare",
+        "build:slive-ui",
+        "apps/slive/scripts/verify-remote.mjs",
+        "build:example:watabegg",
+        "verify:example:watabegg",
+        "verify:workers",
+        "workers verify:fixtures",
+        "workers verify:auth"
+      ]
+    },
+    {
+      "scope": "development",
+      "detail": "修正前からの /@server-reactive/nav の404が残る。背景画像のリクエストはすべて成功。",
+      "baseline": "artifacts/local-images/dev-before.log"
+    },
+    {
+      "scope": "pnpm check",
+      "detail": "PostgreSQL実環境を必要とする既存の9テストはスキップ。今回追加した回帰テストはスキップなし。"
+    },
+    {
+      "scope": "environment",
+      "detail": "Linuxのローカル環境で実行。CI・クリーンコンテナでの再実行は未実施。"
+    }
+  ],
+  "committed": false
+}

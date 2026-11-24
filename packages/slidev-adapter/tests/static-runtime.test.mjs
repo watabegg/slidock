@@ -148,3 +148,52 @@ test('private source fields and HTML comments are stripped before public loader 
     source: { note: '', frontmatterRaw: '', content: 'source-visible' },
   });
 });
+
+test('relative image properties resolve without changing other frontmatter values', async () => {
+  const { patchSlidevImageImports } = await import('@slidock/slidev-adapter/static-runtime');
+  const frontmatter = {
+    background: '../assets/image.svg',
+    backgroundImage: '../assets/image.svg',
+    imageLeft: '../assets/image.svg',
+    imageTopRight: '../assets/image.svg',
+    imageBottomRight: '../assets/image.svg',
+    title: '../assets/image.svg',
+    info: '$& $$',
+    image: 'https://example.test/remote.svg',
+    imageRight: '/public.svg',
+    imageOpacity: 0.5,
+  };
+  const source = `export const frontmatterData = ${JSON.stringify(frontmatter)};`;
+  const patched = patchSlidevImageImports(
+    source,
+    'deck.frontmatter',
+    '/deck/slides.md',
+    frontmatter,
+    [],
+  );
+  const url = 'https://example.test/slides/assets/image-hash.svg';
+  const executable = patched.replace(
+    /^import __labImage0 from .*;$/m,
+    `const __labImage0 = ${JSON.stringify(url)};`,
+  );
+  const module = await import(`data:text/javascript,${encodeURIComponent(executable)}`);
+  assert.deepEqual(module.frontmatterData, {
+    ...frontmatter,
+    background: url,
+    backgroundImage: url,
+    imageLeft: url,
+    imageTopRight: url,
+    imageBottomRight: url,
+  });
+  assert.throws(
+    () =>
+      patchSlidevImageImports(
+        'export const frontmatterData = {};',
+        'changed.frontmatter',
+        '/deck/slides.md',
+        frontmatter,
+        [],
+      ),
+    /frontmatter data signature changed: changed.frontmatter/,
+  );
+});

@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 export type SlideForSanitizing = {
   note?: string;
@@ -33,7 +33,56 @@ export function patchSlidevImageFrontmatter(
   const signature = `"images":${JSON.stringify(images)}`;
   if (!code.includes(signature))
     throw new Error(`Slidev image frontmatter signature changed: ${id}`);
-  return code.replace(signature, `"images":[${urls.join(',')}]`);
+  return code.replace(signature, () => `"images":[${urls.join(',')}]`);
+}
+
+export function patchSlidevImageImports(
+  code: string,
+  id: string,
+  filepath: string,
+  frontmatter: Record<string, unknown>,
+  images: string[],
+): string {
+  const relativeImage = (value: unknown): value is string =>
+    typeof value === 'string' && (value.startsWith('./') || value.startsWith('../'));
+  const properties = Object.entries(frontmatter).filter(
+    (entry): entry is [string, string] =>
+      /^(?:background(?:Image)?|image(?:[A-Z].*)?)$/u.test(entry[0]) && relativeImage(entry[1]),
+  );
+  const paths = [
+    ...new Set([...images.filter(relativeImage), ...properties.map(([, value]) => value)]),
+  ];
+  if (!paths.length) return code;
+  const urls = new Map(
+    paths.map((path, index) => [path, `new URL(__labImage${index}, import.meta.url).href`]),
+  );
+  const imports = paths.map(
+    (path, index) =>
+      `import __labImage${index} from ${JSON.stringify(resolve(dirname(filepath), path) + '?url&no-inline')};`,
+  );
+  // Slidev 52 omits preload metadata. Layout-specific keys such as imageLeft
+  // can still need imports even when Slidev found no preloadable images.
+  if (code.includes(`"images":${JSON.stringify(images)}`))
+    code = patchSlidevImageFrontmatter(
+      code,
+      images,
+      images.map((path) => urls.get(path) ?? JSON.stringify(path)),
+      id,
+    );
+  if (properties.length) {
+    const signature = `export const frontmatterData = ${JSON.stringify(frontmatter)}`;
+    if (!code.includes(signature))
+      throw new Error(`Slidev frontmatter data signature changed: ${id}`);
+    const keys = new Set(properties.map(([key]) => key));
+    const fields = Object.entries(frontmatter).map(
+      ([key, value]) =>
+        `${JSON.stringify(key)}:${keys.has(key) ? urls.get(value as string) : JSON.stringify(value)}`,
+    );
+    // Theme helpers prefix root-relative URLs with BASE_URL. Absolute URLs also
+    // let the stock development preloader use an imported asset without re-prefixing it.
+    code = code.replace(signature, () => `export const frontmatterData = {${fields.join(',')}}`);
+  }
+  return imports.join('\n') + '\n' + code;
 }
 
 export function patchStaticRuntimeModule({
@@ -99,12 +148,17 @@ export function patchStaticRuntimeModule({
   }
 }
 
+export function stripSlidevImagePreloads(html: string): string {
+  // The HTML hints still contain source paths; the runtime preloader receives resolved imports.
+  return html.replace(/<link\b[^>]*\bas=["']image["'][^>]*>/g, '');
+}
+
 export function patchSlidevHtmlEntry(html: string): string {
   const entryPattern = /<script type="module" src="[^"]+"><\/script>/;
   if (!entryPattern.test(html)) throw new Error('Slidev HTML entry signature changed');
-  const transformed = html
-    .replace(entryPattern, '<script type="module" src="/@lab/entry"></script>')
-    .replace(/<link\b[^>]*\bas="image"[^>]*>/g, '');
+  const transformed = stripSlidevImagePreloads(
+    html.replace(entryPattern, '<script type="module" src="/@lab/entry"></script>'),
+  );
   if (!transformed.includes('/@lab/entry')) throw new Error('Slidev HTML entry signature changed');
   return transformed;
 }

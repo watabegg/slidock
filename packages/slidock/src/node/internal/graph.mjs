@@ -24,7 +24,7 @@ import { nativePlayerManifest } from '@slidock/slidev-adapter/native-manifest';
 import { makeNativeUnsupportedForSubpath } from './native-base-path.mjs';
 import {
   patchSlidevHtmlEntry,
-  patchSlidevImageFrontmatter,
+  patchSlidevImageImports,
   patchStaticRuntimeModule,
   rewriteSlidevImports,
   stripPrivateSlideData,
@@ -210,21 +210,13 @@ else {`
           const sourceMatch = original.match(/__slidev_(\d+)\.frontmatter$/);
           if (sourceMatch) {
             const slide = deck.options.data.slides[+sourceMatch[1] - 1];
-            const images = slide.images || slide.source.images || [];
-            const imports = [];
-            const urls = images.map((url, index) => {
-              if (!url.startsWith('./') && !url.startsWith('../')) return JSON.stringify(url);
-              const name = `__labImage${index}`;
-              const image = resolve(dirname(slide.source.filepath), url);
-              imports.push(`import ${name} from ${JSON.stringify(image + '?url&no-inline')};`);
-              return name;
-            });
-            const imageSignature = `"images":${JSON.stringify(images)}`;
-            // Slidev 52 omits the key for empty image lists; the prior replacement was a no-op.
-            const patchedCode = code.includes(imageSignature)
-              ? patchSlidevImageFrontmatter(code, images, urls, original)
-              : code;
-            code = imports.join('\n') + '\n' + patchedCode;
+            code = patchSlidevImageImports(
+              code,
+              original,
+              slide.source.filepath,
+              { ...deck.options.data.headmatter.defaults, ...slide.frontmatter },
+              slide.images || slide.source.images || [],
+            );
           }
           return { code: rewriteSlidevImports(code, deck.prefix), map: { mappings: '' } };
         }

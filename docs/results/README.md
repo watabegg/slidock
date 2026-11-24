@@ -6,6 +6,7 @@
 
 | 日付 | 対象と記録 | 記録内のコミット情報 |
 | --- | --- | --- |
+| 2026-11-24 | [公式テーマのローカル画像・frontmatter の相対画像](relative-frontmatter-images.json) | 未コミット差分 |
 | 2026-10-22 | [Slive ランチャー上の大きさ・見た目の中心](slive-icon-optical.json) | 未コミット差分 |
 | 2026-10-22 | [Slive 原本形状に復元・透明背景と全体拡大](slive-icon-original.json) | 未コミット差分 |
 | 2026-10-22 | [Slive 下部バーだけ中央揃え・拡幅](slive-icon-bar.json) | 未コミット差分 |
