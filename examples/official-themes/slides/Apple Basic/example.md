@@ -15,7 +15,7 @@ Presentation subtitle
 
 ---
 layout: intro-image
-image: 'https://source.unsplash.com/collection/4966472/1920x1080'
+image: '../assets/abstract-background.svg'
 ---
 
 <div class="absolute top-10">
@@ -31,7 +31,7 @@ image: 'https://source.unsplash.com/collection/4966472/1920x1080'
 
 ---
 layout: intro-image-right
-image: 'https://source.unsplash.com/collection/4966472/1920x1080'
+image: '../assets/abstract-background.svg'
 ---
 
 # Slide Title
@@ -39,7 +39,7 @@ image: 'https://source.unsplash.com/collection/4966472/1920x1080'
 
 ---
 layout: image-right
-image: 'https://source.unsplash.com/collection/4966472/1920x1080'
+image: '../assets/abstract-background.svg'
 ---
 
 # Slide Title
@@ -88,14 +88,14 @@ Attribution
 
 ---
 layout: 3-images
-imageLeft: 'https://source.unsplash.com/collection/4966472/1920x1080'
-imageTopRight: 'https://source.unsplash.com/collection/4966472/1920x1080'
-imageBottomRight: 'https://source.unsplash.com/collection/4966472/1920x1080'
+imageLeft: '../assets/abstract-background.svg'
+imageTopRight: '../assets/abstract-background.svg'
+imageBottomRight: '../assets/abstract-background.svg'
 ---
 
 ---
 layout: image
-image: 'https://source.unsplash.com/collection/4966472/1920x1080'
+image: '../assets/abstract-background.svg'
 ---
 
 ---

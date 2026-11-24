@@ -9,7 +9,7 @@
       "version": "0.25.0",
       "entry": "slides/Default/example.md",
       "upstreamPath": "packages/theme-default/example.md",
-      "sha256": "37c090a28d4948d4b9e7c37794f65d1b02f9ae0ecb1069e440361280dbe6d23e"
+      "sha256": "b5530af4aab111004e93392f3d27c9fa0f5efa2cf5d1c2bedb27ef63065e1ac4"
     },
     {
       "id": "Seriph/example",
@@ -18,7 +18,7 @@
       "version": "0.25.0",
       "entry": "slides/Seriph/example.md",
       "upstreamPath": "packages/theme-seriph/example.md",
-      "sha256": "6680e9da277095fea052d9ba1a378cea14bc2738c52db2811455a54dfc711c00"
+      "sha256": "d8795fc517d95433f4ede0c25fa078fa54eca1b3940c6ab7bbd55829167ff76e"
     },
     {
       "id": "Shibainu/example",
@@ -45,7 +45,7 @@
       "version": "0.25.1",
       "entry": "slides/Apple Basic/example.md",
       "upstreamPath": "packages/theme-apple-basic/example.md",
-      "sha256": "7eb29c6d10f717da464c08c6cfdd0aeca00070eaf9718d26f04338ff411cb735"
+      "sha256": "eb3742c5b89f1f1293ad13b8bd8cea8f25d5c6c2656231fdf0be8f09a9254941"
     }
   ]
 }
