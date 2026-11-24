@@ -7,6 +7,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { frameworkVersion, packFramework } from './pack-framework.mjs';
+import { configureInstallRetries } from './consumer-install.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const artifactRoot = join(repository, 'artifacts/framework-v01');
@@ -250,6 +251,7 @@ async function installConsumer({ root, registryUrl, manager, lockDestination }) 
     `${JSON.stringify(
       {
         name: `slidock-${manager}-consumer`,
+        packageManager: 'pnpm@12.3.4',
         private: true,
         type: 'module',
         dependencies: { '@slidock/slidock': frameworkVersion },
@@ -262,10 +264,14 @@ async function installConsumer({ root, registryUrl, manager, lockDestination }) 
     manager === 'npm'
       ? ['install', '--no-audit', '--no-fund', '--no-progress']
       : ['install', '--no-frozen-lockfile', '--no-color'];
-  const installed = await runChecked(manager, args, {
-    cwd: root,
-    env: { ...process.env, npm_config_audit: 'false', npm_config_fund: 'false' },
-  });
+  const installed = await runChecked(
+    manager,
+    [...args, '--prefer-offline', ...(await configureInstallRetries(root, manager))],
+    {
+      cwd: root,
+      env: { ...process.env, npm_config_audit: 'false', npm_config_fund: 'false' },
+    },
+  );
   const lockName = manager === 'npm' ? 'package-lock.json' : 'pnpm-lock.yaml';
   const lockPath = join(root, lockName);
   const lock = await readFile(lockPath, 'utf8');
@@ -887,11 +893,22 @@ async function verifyFrontendConsumer(root, registryUrl) {
     join(fixtureRoot, 'src', 'App.vue'),
     `<script setup lang="ts">\nimport { ref } from 'vue';\nimport { SlidockHome } from '@slidock/slidock/frontend';\nimport type { Catalog } from '@slidock/slidock/client';\nconst catalog: Catalog = { schemaVersion: 1, categories: [], decks: [] };\nconst query = ref('');\nconst tag = ref('');\nconst sort = ref<'catalog' | 'title' | 'date'>('catalog');\n</script>\n<template>\n  <SlidockHome :catalog="catalog" v-model:query="query" v-model:tag="tag" v-model:sort="sort">\n    <template #card="{ deck, href }"><a :href="href">{{ deck.title }}</a></template>\n    <template #empty="{ reason }"><p>{{ reason }}</p></template>\n  </SlidockHome>\n</template>\n`,
   );
-  const install = await runChecked('npm', ['install', '--no-audit', '--no-fund', '--no-progress'], {
-    cwd: fixtureRoot,
-    timeoutMs: 10 * 60_000,
-    env: { ...process.env, npm_config_audit: 'false', npm_config_fund: 'false' },
-  });
+  const install = await runChecked(
+    'npm',
+    [
+      'install',
+      '--no-audit',
+      '--no-fund',
+      '--no-progress',
+      '--prefer-offline',
+      ...(await configureInstallRetries(fixtureRoot, 'npm')),
+    ],
+    {
+      cwd: fixtureRoot,
+      timeoutMs: 10 * 60_000,
+      env: { ...process.env, npm_config_audit: 'false', npm_config_fund: 'false' },
+    },
+  );
   const typecheck = await runChecked(
     process.execPath,
     [join(fixtureRoot, 'node_modules/vue-tsc/bin/vue-tsc.js'), '--noEmit'],

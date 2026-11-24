@@ -241,38 +241,48 @@ test('check resolves an explicit config relative to a nondefault working directo
   });
 });
 
-test('preview serves an existing build after its configured source directory is gone', async () => {
-  await withTempDir(async (cwd) => {
-    const site = path.join(cwd, 'site');
-    await mkdir(site);
-    await writeFile(path.join(site, 'index.html'), '<h1>built site</h1>\n');
-    await writeFile(
-      path.join(cwd, 'slidock.config.mjs'),
-      "export default { sourceRoot: './removed-source', outDir: './site' };\n",
-    );
+test(
+  'preview serves an existing build after its configured source directory is gone',
+  { timeout: 90_000 },
+  async (t) => {
+    await withTempDir(async (cwd) => {
+      const site = path.join(cwd, 'site');
+      await mkdir(site);
+      await writeFile(path.join(site, 'index.html'), '<h1>built site</h1>\n');
+      await writeFile(
+        path.join(cwd, 'slidock.config.mjs'),
+        "export default { sourceRoot: './removed-source', outDir: './site' };\n",
+      );
 
-    const child = spawn(process.execPath, [binPath, 'preview', '--port', '0', '--json'], { cwd });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8').on('data', (chunk) => (stdout += chunk));
-    child.stderr.setEncoding('utf8').on('data', (chunk) => (stderr += chunk));
-    const ready = await new Promise((accept, reject) => {
-      const timer = setTimeout(() => reject(new Error(`preview did not start: ${stderr}`)), 10_000);
-      child.stdout.on('data', () => {
-        const line = stdout.split('\n')[0];
-        if (!line) return;
-        clearTimeout(timer);
-        accept(JSON.parse(line));
+      const child = spawn(process.execPath, [binPath, 'preview', '--port', '0', '--json'], { cwd });
+      t.after(() => {
+        if (child.exitCode === null) child.kill('SIGKILL');
       });
-      child.once('error', reject);
-      child.once('close', (status) => reject(new Error(`preview exited ${status}: ${stderr}`)));
+      let stdout = '';
+      let stderr = '';
+      child.stdout.setEncoding('utf8').on('data', (chunk) => (stdout += chunk));
+      child.stderr.setEncoding('utf8').on('data', (chunk) => (stderr += chunk));
+      const ready = await new Promise((accept, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`preview did not start: ${stderr}`)),
+          60_000,
+        );
+        child.stdout.on('data', () => {
+          const line = stdout.split('\n')[0];
+          if (!line) return;
+          clearTimeout(timer);
+          accept(JSON.parse(line));
+        });
+        child.once('error', reject);
+        child.once('close', (status) => reject(new Error(`preview exited ${status}: ${stderr}`)));
+      });
+      assert.equal(ready.ok, true);
+      assert.equal(ready.command, 'slidock preview');
+      assert.match(await (await fetch(ready.result.url)).text(), /built site/u);
+      child.kill('SIGTERM');
+      const [status] = await once(child, 'close');
+      assert.equal(status, 143);
+      assert.equal(stdout.trim().split('\n').length, 1, stdout);
     });
-    assert.equal(ready.ok, true);
-    assert.equal(ready.command, 'slidock preview');
-    assert.match(await (await fetch(ready.result.url)).text(), /built site/u);
-    child.kill('SIGTERM');
-    const [status] = await once(child, 'close');
-    assert.equal(status, 143);
-    assert.equal(stdout.trim().split('\n').length, 1, stdout);
-  });
-});
+  },
+);

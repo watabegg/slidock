@@ -177,6 +177,14 @@ jobs:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: pnpm-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-node24-
+      - name: Locate npm cache for external consumers
+        id: npm-cache
+        run: echo "path=$(npm config get cache)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.npm-cache.outputs.path }}
+          key: npm-${{ runner.os }}-${{ runner.arch }}-node24-${{ hashFiles('pnpm-lock.yaml', 'scripts/verify-packed-framework.mjs') }}
+          restore-keys: npm-${{ runner.os }}-${{ runner.arch }}-node24-
       - run: pnpm install --frozen-lockfile
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:

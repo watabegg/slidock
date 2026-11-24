@@ -177,7 +177,7 @@ async function verify(remoteOrigin, protocol, metadata) {
             );
           },
           { pageNumber, clicks },
-          { timeout: 3000 },
+          { timeout: 30000 },
         );
         const visibleClicks = await frame.evaluate((pageNumber) => {
           const slide = [...document.querySelectorAll('#slide-content .slidev-page')].find(
@@ -235,9 +235,13 @@ async function verify(remoteOrigin, protocol, metadata) {
         const target = window.poc.controller.active.frame.contentWindow;
         target.postMessage({ nativeTestKey: 'Enter' }, remoteOrigin);
         target.postMessage({ nativeTestKeyUp: 'Enter' }, remoteOrigin);
+        // Messages from this frame are FIFO: the sentinel input follows both key events.
+        target.postMessage({ nativeTestKey: 'ArrowLeft' }, remoteOrigin);
       }, remoteOrigin);
-      await page.waitForFunction((count) => window.poc.inputs.length > count, before.count);
-      await page.waitForTimeout(100);
+      await page.waitForFunction(
+        (count) => window.poc.inputs.includes('previous', count),
+        before.count,
+      );
       const after = await page.evaluate(() => ({
         inputs: window.poc.inputs,
         reports: window.poc.reports.length,
@@ -245,7 +249,7 @@ async function verify(remoteOrigin, protocol, metadata) {
       }));
       check(
         `keydown and keyup produce one host input ${current.id}`,
-        after.inputs.length === before.count + 1 && after.inputs.at(-1) === 'next',
+        JSON.stringify(after.inputs.slice(before.count)) === JSON.stringify(['next', 'previous']),
         { runtimeVersion: report.runtimeVersion, theme: report.theme },
       );
       const nativeTheme = await keyFrame.evaluate(() => ({
@@ -319,6 +323,51 @@ async function verify(remoteOrigin, protocol, metadata) {
           new URL(frame.url()).origin === remoteOrigin && frame.url().includes(`/${state.deckId}/`),
       );
     const routeBefore = await activeFrame.evaluate(() => location.href);
+    await activeFrame.evaluate(() => {
+      const router = window.__slidevLabNative.router;
+      // Vue Router may reserialize equivalent query values (for example ':' vs '%3A').
+      window.guardRouteKey = (route) => {
+        const url = new URL(route, location.href);
+        url.searchParams.sort();
+        return url.href;
+      };
+      window.guardRoutes = [];
+      window.guardRouteBefore = window.guardRouteKey(router.currentRoute.value.fullPath);
+      window.stopGuardRoutes = router.afterEach((to) =>
+        window.guardRoutes.push(window.guardRouteKey(to.fullPath)),
+      );
+    });
+    const stateBarrier = async () => {
+      const reportCount = await page.evaluate(() => window.poc.reports.length);
+      // A fresh revision at the same route must be acknowledged. An invalid high
+      // revision accepted by mistake would prevent this acknowledgement entirely.
+      await setState(
+        metadata.decks.find((deck) => deck.id === state.deckId),
+        state.page,
+        state.clickIndex,
+      );
+      const routeHistory = await activeFrame.evaluate(() => {
+        const history = { routes: window.guardRoutes, before: window.guardRouteBefore };
+        window.guardRoutes = [];
+        return history;
+      });
+      assert.deepEqual(
+        routeHistory.routes.filter((route) => route !== routeHistory.before),
+        [],
+        JSON.stringify(routeHistory),
+      );
+      assert.equal(
+        await activeFrame.evaluate(() => window.guardRouteKey(location.href)),
+        await activeFrame.evaluate((route) => window.guardRouteKey(route), routeBefore),
+        'route after barrier ACK',
+      );
+      assert.equal(
+        await page.evaluate(() => window.poc.reports.length),
+        reportCount + 1,
+        'reports after barrier ACK',
+      );
+      return true;
+    };
     await activeFrame.evaluate(
       ({ state }) => {
         window.dispatchEvent(
@@ -333,12 +382,9 @@ async function verify(remoteOrigin, protocol, metadata) {
       },
       { state },
     );
-    await page.waitForTimeout(100);
-    check(
-      'bridge rejects state with forged parent origin',
-      (await activeFrame.evaluate(() => location.href)) === routeBefore,
-      { method: 'synthetic bridge message guard call' },
-    );
+    check('bridge rejects state with forged parent origin', await stateBarrier(), {
+      method: 'synthetic bridge message guard call',
+    });
     await activeFrame.evaluate(
       ({ state }) => {
         const origin = new URL(location.href).searchParams.get('nativeParentOrigin');
@@ -361,11 +407,11 @@ async function verify(remoteOrigin, protocol, metadata) {
       },
       { state },
     );
-    await page.waitForTimeout(100);
     check(
       'bridge ignores malformed and stale state from the authorized parent',
-      (await activeFrame.evaluate(() => location.href)) === routeBefore,
+      await stateBarrier(),
     );
+    await activeFrame.evaluate(() => window.stopGuardRoutes());
     const errorBefore = await page.evaluate(() => window.poc.errors.length);
     const mismatch = await page.evaluate(() => {
       const s = window.poc.controller.active;

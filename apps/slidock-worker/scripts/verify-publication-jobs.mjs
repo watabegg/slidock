@@ -186,22 +186,6 @@ async function waitForCondition(condition, label, timeoutMs) {
   }
 }
 
-async function findFreePort() {
-  const { createServer } = await import('node:net');
-  const listener = createServer();
-  await new Promise((accept, reject) => {
-    listener.once('error', reject);
-    listener.listen(0, '127.0.0.1', accept);
-  });
-  const address = listener.address();
-  check(address !== null && typeof address !== 'string', 'could not reserve a local API port');
-  const port = address.port;
-  await new Promise((accept, reject) =>
-    listener.close((error) => (error ? reject(error) : accept())),
-  );
-  return port;
-}
-
 function serverEnvironment(renderer, apiOrigin) {
   const databaseUrl = process.env.HUB_TEST_DATABASE_URL;
   check(
@@ -226,15 +210,25 @@ function serverEnvironment(renderer, apiOrigin) {
 }
 
 async function startApi(renderer) {
-  const port = await findFreePort();
-  const apiOrigin = 'http://127.0.0.1:' + port;
-  const env = serverEnvironment(renderer, apiOrigin);
-  const application = await createConfiguredHub(env);
-  let listener;
+  let application;
+  // Keep the listener bound while configuring the application with its actual origin.
+  const listener = await startHubServer({
+    server: {
+      fetch: (request) => {
+        check(application, 'Node API received a request before configuration');
+        return application.server.fetch(request);
+      },
+    },
+    host: '127.0.0.1',
+    port: 0,
+  });
+  const apiOrigin = listener.origin;
+  let env;
   try {
-    listener = await startHubServer({ server: application.server, host: '127.0.0.1', port });
+    env = serverEnvironment(renderer, apiOrigin);
+    application = await createConfiguredHub(env);
   } catch (error) {
-    await application.close();
+    await listener.close();
     throw error;
   }
   equal(listener.origin, apiOrigin, 'Node API did not bind to its configured public origin');

@@ -1,5 +1,7 @@
 # CI 検証の安定化 検証記録
 
+> 前半の原因調査と実行結果は初回対応時の記録です。候補 8 件の追加対応は下表と「追加安定化の検証（2026-11-24）」に記載しています。
+
 `verify-remote` 検証をローカルで再現して特定した原因は、Vue のページ再入場トランジションに伴う一時的な非表示状態で bridge が誤って失敗を返していたこと、および検証スクリプト側が失敗通知を待機条件に含めず ACK だけを待ち続けていたことにある。成功したチェック数や操作、エラーのスタックトレースが一致することから、CI 上の HTTP タイムアウトでも同じ競合が起きたと考えられる。12 秒の期限内で過渡的な透明状態を許容して再待機するように bridge を修正し、検証スクリプトも失敗通知の受信や実際の DOM 条件を待つように改めた結果、修正対象の各検証が直列 3 回連続で成功することを確認した。あわせて CI 関連スクリプトおよびテストファイル 53 件を監査し、今回は変更しない 8 件の候補と据え置きの理由を整理した。
 
 ## 対象と制約
@@ -85,26 +87,77 @@ CI 実行時には各時点の DOM 状態や `hostState` を保存していな�
 
 調査で見つかった処理のうち、`publication` や `worker` の 50〜300ms の遅延などは条件ポーリングの間隔、`verify-flicker` の sleep は意図的なドキュメント遅延や観測サンプリング、`native` の 180 秒は QA 期限、5 秒は SIGTERM の猶予であり、いずれも固定の起動完了待ちではない。`portable` の子コマンドは直列実行であり、runtime・package・fixture の前提を組む現行の依存順序に新しい欠落は見つからなかった。なお、検証用アプリの listen ポートは port 0 を使用しており、下記の再 bind 以外の固定アプリポートは検出されなかった。ただし、同一成果物ディレクトリを複数検証から同時実行する安全性は未実測である。また、外部の画像・フォント・CDN への新しい直接要求は監査範囲で見つからなかったものの、すべての生成資産の完全な通信トレースを取得したわけではなく、依存取得やオフライン資産準備のビルド段階については完全オフライン保証ではない。
 
-以下の 8 件は、変更の必要性や再現が未確定であるか、検査目的そのものに関わるため、今回は修正せず残した。
+初回監査で据え置いていた 8 件の未修正候補に対し、同日追加で検証側の安定化対応を実施し、7 件を修正して 1 件を据え置きとしました。修正にあたっては成功時の経路に固定時間の待機を入れず、条件付き待機のタイムアウト上限の延長と失敗時のリトライによって不安定さを抑えています。完全なオフライン化は行っておらず、処理時間の短縮効果は未計測であり、厳密に所要時間が変わらないことも保証しません。変更は検証側のコード・設定・結果文書のみにとどまり、製品ソースコードの変更、`DECISIONS` への追加、`.env` および `.env.*` の操作は行っていません（変更は `main` 作業ツリー上のみで、コミットやプッシュは未実施です）。
 
-| 対象箇所 | 挙動とリスク | 今回修正せず残した理由 |
+| 対象箇所 | 挙動とリスク | 今回の対応・見送り理由 |
 | :--- | :--- | :--- |
-| [verify-packed-framework.mjs](../../scripts/verify-packed-framework.mjs#L136-L140)（[136–140](../../scripts/verify-packed-framework.mjs#L136-L140)、[261–268 行](../../scripts/verify-packed-framework.mjs#L261-L268)） | `@slidock` のみ local registry、他依存は `registry.npmjs.org` を参照する。生成する consumer の lockfile は install 後に作成されるため、ネットワーク停止や推移的依存更新の影響を受け得る。 | 外部 consumer の導入確認という目的があり、単純に offline 化すると別の検証になるため。 |
-| [verify-packed-cli.mjs](../../scripts/verify-packed-cli.mjs#L42-L43)（42–43 行）、[verify-packed-server.mjs](../../scripts/verify-packed-server.mjs#L11-L13)（11–13 行） | `prefer-offline` にはフォールバックがあり、server の install も実 registry に依存する。 | packaged consumer 検証としての性質を今回変更しないため。 |
-| [verify-publication-jobs.mjs](../../apps/slidock-worker/scripts/verify-publication-jobs.mjs#L194-L202)（[194–202](../../apps/slidock-worker/scripts/verify-publication-jobs.mjs#L194-L202)、[228–240 行](../../apps/slidock-worker/scripts/verify-publication-jobs.mjs#L228-L240)） | port 0 で空きポートを取得して close し、`createConfiguredHub` へ `public origin` を設定してから再 bind する間に他プロセスが取得すると `EADDRINUSE` になり得る（固定ポートではないが TOCTOU がある）。 | 事前に `public origin` を構成へ与える必要があるため、今回起動構成を変更しない。未再現。 |
-| [verify-remote.mjs](../../apps/slive/scripts/verify-remote.mjs#L240)（[240](../../apps/slive/scripts/verify-remote.mjs#L240)、[336](../../apps/slive/scripts/verify-remote.mjs#L336)、[364 行](../../apps/slive/scripts/verify-remote.mjs#L364)） | キー重複入力がないこと、および偽造・不正な state で route が変わらないことを 100ms の否定観測で確認している。100ms 以降に起きる回帰は見逃し得る。 | 起動待ちではなく、無期限に「起きないこと」は待てないため。 |
-| [verify-remote.mjs](../../apps/slive/scripts/verify-remote.mjs#L180)（180 行） | クリック後の CSS 変化を 3 秒で待機する。極端な CPU 負荷下での余裕は未測定（今回 1 CPU 制限で 3 回成功）。 | ACK 後の実 DOM 条件待ちであり、タイムアウト延長の根拠がないため。 |
-| [cli.test.mjs](../../packages/cli/tests/cli.test.mjs#L24-L29)（[24–29](../../packages/cli/tests/cli.test.mjs#L24-L29)、[281–295 行](../../packages/cli/tests/cli.test.mjs#L281-L295)）、[project.test.mjs](../../packages/slidock/tests/project.test.mjs#L259-L269)（259–269 行） | CLI 実行を 20 秒、起動出力を 10 秒の条件待ちで検査している。ローカル Node 環境には妥当だが、極端な runner 遅延のリスクは残る。 | タイムアウトの延長だけは行わないため。 |
-| [renderer.test.mjs](../../packages/renderer-playwright/tests/renderer.test.mjs#L258)（[258](../../packages/renderer-playwright/tests/renderer.test.mjs#L258)、[263–273 行](../../packages/renderer-playwright/tests/renderer.test.mjs#L263-L273)） | wall timeout 4 秒を 5 秒以内で検査しており、スケジュール余裕が 1 秒ある。過負荷では偽陰性の余地がある。 | queue 待ちを含むタイムアウト契約自体を検査しており、単純な削除や延長を行わないため（`pnpm check` で成功）。 |
-| workflow の PostgreSQL ポート（`5432` / `55461`） | workflow で明示した専用サービスであり、ローカルで並行利用すると競合し得る。 | workflow が今回編集禁止対象であるため。 |
+| [scripts/verify-packed-framework.mjs](../../scripts/verify-packed-framework.mjs)<br>（[.github/workflows/checks.yml](../../.github/workflows/checks.yml) の `framework` ジョブ含む） | `@slidock` のみ一時ローカルレジストリ、それ以外は実 npm レジストリを参照するため、通信の一時失敗やキャッシュ未活用で依存導入が失敗するリスクがある。 | 既存のレジストリ構成を維持したまま、[scripts/consumer-install.mjs](../../scripts/consumer-install.mjs) の共通設定（`fetch-retries=4`、`fetch-retry-mintimeout=1000ms`、`fetch-retry-maxtimeout=10000ms`、`prefer-offline`）を `npm`・`pnpm` およびフロントエンドの `npm install` に適用し、未取得の依存パッケージはレジストリから取得するようにした。`pnpm` には `configureInstallRetries` により一時コンシューマーの `pnpm-workspace.yaml` へ `fetchRetries: 4`・`fetchRetryMintimeout: 1000`・`fetchRetryMaxtimeout: 10000` を追記して CLI 引数は返さず（[pnpm のネットワーク設定](https://pnpm.io/settings/network)）、`npm` には `--fetch-retries=4` などの CLI 引数形式で渡す（`pnpm` 12 では CLI 形式が受理されても期待どおりの再試行を確認できず、YAML 設定への変更後に HTTP 503 を越えて導入に成功した）。`framework` ジョブには `npm config get cache` で得る実キャッシュパス向けの `actions/cache` を追加し、既存の pnpm store キャッシュも維持した。 |
+| [scripts/verify-packed-cli.mjs](../../scripts/verify-packed-cli.mjs) /<br>[scripts/verify-packed-server.mjs](../../scripts/verify-packed-server.mjs) | 一時的なレジストリ通信障害やキャッシュ未活用により、依存導入が失敗して検証が中断するリスクがある。 | 同じ要求単位のリトライ設定と `prefer-offline` を導入し、`ignore-scripts` を維持した。CLI の既存 tarball 隔離・リポジトリ symlink 不使用および server の HTTP 公開検査は維持している。リトライ上限を超えた失敗を成功扱いするコードはなく、再試行の対象は `install` 全体ではなくレジストリ要求のみに限定している。 |
+| [apps/slidock-worker/scripts/verify-publication-jobs.mjs](../../apps/slidock-worker/scripts/verify-publication-jobs.mjs) | `findFreePort` で空きポートを取得して閉じた後に再バインドするため、起動までの間に別プロセスへポートを奪われる競合リスクがある。 | `findFreePort` を削除し、`startHubServer` でポート `0` の listener を先にバインドしてオリジンを確定させたうえで、`fetch` を後から構成した `application.server` へ委譲する構成へ変更した。同じ listener を保持して `publicOrigin` に設定するためクローズと再バインド自体がなくなり、構成失敗時は listener を閉じ、終了時は listener とアプリケーションの双方を閉じる。製品の adapter 側には変更を加えていない。 |
+| [apps/slive/scripts/verify-remote.mjs](../../apps/slive/scripts/verify-remote.mjs)<br>（固定待機・状態検査） | `waitForTimeout(100)` を 3 か所で固定待機として使っており、不安定さや不正状態・異常遷移の見逃しにつながるリスクがある。 | `waitForTimeout(100)` を 3 か所とも削除した。キーの down/up 後は同じ親から `ArrowLeft` を sentinel として FIFO 送信し、host 側の `previous` 通知まで待って入力列が正確に `next,previous` であることと `route`・`reports`・`token` が変化しないことを検査する。不正状態の送信後は現在と同じ `page` と `clickIndex` を保持したまま `sessionRevision` だけを増やした状態を送信して ACK を待ち、ACK の増加数が正確に 1 件であることを確認する（高 revision の不正状態が受理された場合は後続の正 revision の ACK が返らず失敗する）。また、`router.afterEach` で中間ルートも観測して異常遷移が後の正しい状態で上書きされ隠蔽されるのを防ぎ、Vue Router の URL エンコード表記差（`:` と `%3A` 等）は値を正規化して比較する。なお、無期限に未来の不発までを保証する検査ではない。 |
+| [apps/slive/scripts/verify-remote.mjs](../../apps/slive/scripts/verify-remote.mjs)<br>（クリック CSS 条件待ち） | クリック対象の CSS 条件待ち上限が `3000ms` と短く、高負荷時に条件成立前にタイムアウトするリスクがある。 | クリックの CSS 条件待ち上限を `3000ms` から `30000ms` へ延長した。既存の描画ブリッジ待ち（12 秒）と ACK 待ち（18 秒）の上限は維持している。 |
+| [packages/cli/tests/cli.test.mjs](../../packages/cli/tests/cli.test.mjs) /<br>[packages/slidock/tests/project.test.mjs](../../packages/slidock/tests/project.test.mjs) | `cli.test.mjs` の `spawnSync`（20 秒）と `serve` 起動出力待ち（10 秒）、および `project.test.mjs` の `preview` 起動出力待ち（10 秒）の上限が短く、負荷時にタイムアウトするリスクがある。 | `cli.test.mjs` では `spawnSync` を 20 秒から 60 秒、`serve` 起動出力待ちを 10 秒から 60 秒へ延長し、`project.test.mjs` では `preview` 起動出力待ちを 10 秒から 60 秒へ延長した。`ready` テストには `node:test` 全体のタイムアウト 90 秒と終了時の子プロセス後始末を追加した。`project.test.mjs` の `spawnSync`（30 秒）は今回の対象外として維持し、成功時の固定待ちは追加していない。 |
+| [packages/renderer-playwright/tests/renderer.test.mjs](../../packages/renderer-playwright/tests/renderer.test.mjs) | wall 上限（`5000ms`）および `node:test` 全体上限（`20000ms`）がレンダラーの設定タイムアウト（`timeoutMs` `4000ms`）に対して狭く、スケジューラ遅延時に検査が打ち切られるリスクがある。 | レンダラーの設定タイムアウト `4000ms`、実行中（`active`）・キュー待ち（`queued`）両方の要求が `timed out` エラーになる確認、およびキュー待ち要求がナビゲーションを起こさない確認を維持しつつ、wall 上限を `5000ms` から `30000ms`、`node:test` 全体を `20000ms` から `60000ms` へ延長した。無限待ちは許さず、スケジューラの余裕のみを広げている。 |
+| [.github/workflows/checks.yml](../../.github/workflows/checks.yml)<br>（PostgreSQL ポート `5432` / `55461`） | 固定ポート `5432` および `55461` を使用しており、同一ホストでの並行実行時に競合するリスクがある。 | 据え置きとした。GitHub-hosted ランナーはジョブ専用の VM とサービスコンテナで動くためジョブ間のホストポート競合は起きず、publication 検証にも専用の `127.0.0.1:55461/hub_jobs` による誤接続防止があるため不要な上書きを追加しない。ローカル環境で同時起動した場合の競合は制限事項として残る。 |
 
-## 設計判断
+## 初回対応時の設計判断
 
 `verify-remote` の表示同期タイムアウトに対しては、通信のワイヤー形式・Rust 側の状態権威・既存の 12 秒と 18 秒のタイムアウト値を維持したまま、`deck-bridge` が 12 秒の期限内で一時的な `opacity: 0` を即エラーにせず再待機ループを継続し、`verify-remote` が ACK と新規 host error の双方を待つ方針を採用した。これにより Vue の再入場トランジションに伴う過渡的な透明状態で誤失敗せず、非表示が継続して表示へ至らない状態は `deck-bridge` 側の 12 秒の描画期限で失敗とし、検証側は失敗通知を受けた時点で 18 秒の ACK 待ちタイムアウトを待たずに検出できる。あわせて `verify` と `verify-library` の固定 sleep を実 DOM 条件や `opacity` の待機へ置き換え、常時表示設定を回避する viewport（`1440x810`）へ是正した。一方、実 registry を参照する packaged consumer 検証、タイムアウト契約テスト、否定観測用の短時間待機、および未再現のポート再 bind 競合などは、検査目的そのものを損なわないことと根拠のない延長・変更を避けることから今回は据え置いた。
 
-## 未検証事項
+## 初回対応時の未検証事項
 
 - GitHub Actions 上での再実行、全量 `portable`、packed consumer、publication-jobs、`native` 回帰、およびクリーンコンテナ環境は未実行である。
 - Rust・Tauri・WebKit、物理 2 画面構成、Windows、および外部クラウド環境は未検証であり、Chromium 上での protocol シミュレーション成功とは区別する必要がある。
 - `pnpm check` でスキップされた PostgreSQL 統合テスト 9 件は成功扱いしない。
 - 負荷試験は 1 CPU 制限下での `verify-remote.mjs` 3 回実行にとどまるため、CPU が CI 障害の唯一の要因であるとは断言できない。
+
+## 追加安定化の検証（2026-11-24）
+
+上記の 8 項目に加え、追加監査として次の 3 点にも対応しました。まず、[scripts/verify-packed-cli.mjs](../../scripts/verify-packed-cli.mjs) における `serve` 起動準備の条件待ち上限を `15000ms` から `60000ms` へ延長しています。次に、[scripts/verify-packed-framework.mjs](../../scripts/verify-packed-framework.mjs) が生成する検証用コンシューマーの `packageManager` を `pnpm@12.3.4` に固定しました。以前は `packageManager` の記載がなく、ローカル環境の shim によって別バージョンの `pnpm` が選ばれる場合があったため、CI と同じバージョンで検証できるようにしています。
+
+さらに、リトライ挙動を手動で検証するスクリプトとして [scripts/verify-install-retries.mjs](../../scripts/verify-install-retries.mjs) を新規作成しました。このスクリプトは `npm` と `pnpm` のそれぞれに対し、固有名の最小パッケージを一時的なローカルレジストリから導入させます。メタデータ取得には最初の 3 回、tarball 取得には最初の 1 回だけ HTTP 503 を返し、メタデータ 4 回以上・tarball 2 回以上の要求で導入に成功すること、および正しいパッケージが導入されたこと（`installed.name === name`）をアサートします（実装に依存する追加の確認要求を許容しており、実測では `npm` がメタデータ 4 回・tarball 2 回、`pnpm` がメタデータ 5 回・tarball 3 回でした）。共有キャッシュを使用しつつ `npm pack` による tarball キャッシュの予熱を避けるため `tar` でテスト用パッケージを生成し、外部の `packageManager` 解決を妨げないようスコープ付きレジストリを設定しています。通常の CI には組み込まず手動検証のみに用いるため、正常時の CI 実行時間に負担を増やしません。
+
+### 変更ファイル一覧
+
+今回の追加安定化における作業ツリー上の変更ファイルは全 12 ファイルです。
+
+- [.github/workflows/checks.yml](../../.github/workflows/checks.yml)
+- [scripts/consumer-install.mjs](../../scripts/consumer-install.mjs)（新規）
+- [scripts/verify-install-retries.mjs](../../scripts/verify-install-retries.mjs)（新規）
+- [scripts/verify-packed-framework.mjs](../../scripts/verify-packed-framework.mjs)
+- [scripts/verify-packed-cli.mjs](../../scripts/verify-packed-cli.mjs)
+- [scripts/verify-packed-server.mjs](../../scripts/verify-packed-server.mjs)
+- [apps/slidock-worker/scripts/verify-publication-jobs.mjs](../../apps/slidock-worker/scripts/verify-publication-jobs.mjs)
+- [apps/slive/scripts/verify-remote.mjs](../../apps/slive/scripts/verify-remote.mjs)
+- [packages/cli/tests/cli.test.mjs](../../packages/cli/tests/cli.test.mjs)
+- [packages/slidock/tests/project.test.mjs](../../packages/slidock/tests/project.test.mjs)
+- [packages/renderer-playwright/tests/renderer.test.mjs](../../packages/renderer-playwright/tests/renderer.test.mjs)
+- [docs/results/ci-stability.md](./ci-stability.md)
+
+### 検証表
+
+| 検証コマンド | 結果 | 条件・補足 | ログ |
+| :--- | :--- | :--- | :--- |
+| `pnpm build:packages` | 終了コード `0` | パッケージビルド | [build-packages.log](../../artifacts/ci-stability-followup/build-packages.log) |
+| `SLIDOCK_PACKAGES_BUILT=1 pnpm build:workers` | 終了コード `0` | ワーカービルド | [build-workers.log](../../artifacts/ci-stability-followup/build-workers.log) |
+| `SLIDOCK_PACKAGES_BUILT=1 pnpm verify:packed-cli` | 終了コード `0` | packed CLI 検証 | [packed-cli.log](../../artifacts/ci-stability-followup/packed-cli.log) |
+| `SLIDOCK_PACKAGES_BUILT=1 pnpm verify:packed-server` | 終了コード `0` | packed server 検証 | [packed-server.log](../../artifacts/ci-stability-followup/packed-server.log) |
+| `SLIDOCK_PACKAGES_BUILT=1 pnpm verify:packed-framework` | 終了コード `0` | packed framework 検証 | [packed-framework.log](../../artifacts/ci-stability-followup/packed-framework.log) |
+| `HUB_TEST_DATABASE_URL=postgres://hub:local-test-only@127.0.0.1:55461/hub_jobs node apps/slidock-worker/scripts/verify-publication-jobs.mjs` | 終了コード `0`（16 passed / 0 failed） | イメージ `postgres:17-alpine` の使い捨て専用コンテナ `slidock-ci-stability-jobs` のみを使用して実行（既存 DB は不使用、DB テストと publication 実行の終了後に `docker stop` 終了コード `0` で破棄済み） | [publication-jobs.log](../../artifacts/ci-stability-followup/publication-jobs.log) |
+| `node --test packages/cli/tests/cli.test.mjs packages/slidock/tests/project.test.mjs packages/renderer-playwright/tests/renderer.test.mjs` | 終了コード `0`（27 tests / 27 pass / 0 skip） | 変更対象テストの一括実行 | [changed-tests.log](../../artifacts/ci-stability-followup/changed-tests.log) |
+| `taskset -c 0 node apps/slive/scripts/verify-remote.mjs`（3 回実行） | 終了コード `0` / `0` / `0`（毎回 HTTP 33 + HTTPS 33 checks） | 単一 CPU コア固定で 3 回実行。JSON 出力も `../../artifacts/ci-stability-followup/` 配下に保存 | [remote-1.log](../../artifacts/ci-stability-followup/remote-1.log) / [remote-2.log](../../artifacts/ci-stability-followup/remote-2.log) / [remote-3.log](../../artifacts/ci-stability-followup/remote-3.log) |
+| `pnpm lint` | 終了コード `0` | リント検査 | [lint.log](../../artifacts/ci-stability-followup/lint.log) |
+| `pnpm format:check` | 終了コード `0` | フォーマット検査 | [format-check.log](../../artifacts/ci-stability-followup/format-check.log) |
+| `node scripts/verify-install-retries.mjs` | 終了コード `0`（`npm`: メタデータ 4 回 / tarball 2 回、`pnpm`: メタデータ 5 回 / tarball 3 回） | ローカルレジストリのメタデータ HTTP 503×3・tarball HTTP 503×1 を越えて導入を確認 | [install-retries.log](../../artifacts/ci-stability-followup/install-retries.log) |
+| `SLIDOCK_PACKAGES_BUILT=1 HUB_TEST_DATABASE_URL=postgres://hub:local-test-only@127.0.0.1:55461/hub WRANGLER_LOG_PATH=/home/watabegg/slidock/artifacts/ci-stability-followup/wrangler pnpm check` | 終了コード `0`（425 tests / 425 pass / 0 fail / 0 skip） | `remote` 等の終了後に PostgreSQL 専用コンテナ内 `hub` DB を使用して直列で再実行。事前の通常ビルド付き `pnpm check` も終了コード `0`（ただし network helper 変更前のため、最終コードの検証は記載の環境変数を用いたこの結果） | [check.log](../../artifacts/ci-stability-followup/check.log) |
+
+### 失敗した試行と制限事項
+
+作業中に発生した初回試行の失敗と、それに対する修正内容・未検証の範囲は次のとおりです。
+
+- **`pnpm install` のリトライフラグ形式誤り**: 旧来の `fetch-retries` フラグ形式を `pnpm install` へ直接渡したことで終了コード `1` となりました。その後 `pnpm` 12 の `--config` 形式へ切り替えたところ引数自体は受理されたものの、HTTP 503 が 3 回連続する導入検証に失敗したため、最終的に `pnpm-workspace.yaml` へ設定を書き出す方式へ修正して成功しています。
+- **リトライ検証用パッケージ生成によるキャッシュ予熱**: `npm pack` でテスト用パッケージを生成したところ共有キャッシュに tarball が登録され、tarball 取得の HTTP 通信が省略されてアサートに失敗しました。`tar` で直接生成する方式へ修正しています。
+- **リトライ検証時のレジストリ向き先過多**: 全レジストリをローカルへ向けたため、`packageManager` による `pnpm` の取得までローカルレジストリへ向かい失敗しました。スコープ付きレジストリ設定へ修正済みです。
+- **`verify-remote.mjs` 新障壁での表記差誤判定**: 初回試行で Vue Router の URL エンコード表記差（`:` と `%3A` 等）をルート変更と誤判定して終了コード `1` となりました。値を正規化して比較するよう修正した後、3 回成功しています。
+- **`pnpm check` の初回失敗（終了コード `1`）**: `remote` 検証の `buildNativeUi` から呼ばれる `buildProtocol` が `dist` を削除して再生成している間に、並行実行していた `typecheck` が `@slidock/protocol/contracts` を解決できず終了コード `1` で失敗しました。初回の失敗ログは保存しておらず、`remote` 等の完了後に直列で再実行して終了コード `0`（全 425 テスト成功、スキップ 0）を確認し、[check.log](../../artifacts/ci-stability-followup/check.log) をこの再実行結果で上書きしました。この競合に対して新たな CI 修正は行わず、同一作業ツリーでの重複ビルドを避ける運用としています。
+- **未検証事項・制限事項**: GitHub Actions 上での実実行、実際のキャッシュヒット率、処理速度の改善、クリーンコンテナでの全量 portable / native 検証は未実施です。リトライ検証はローカルで HTTP 503 を返す範囲の実測であり、実 npm レジストリの長期障害や DNS/TLS 障害は未検証です。また、Rust / Tauri / WebKit / Windows、物理 2 画面、実クラウド環境での検証は実施しておらず、ローカル環境で PostgreSQL の固定ポート（`5432` / `55461`）を並行利用した際のポート競合も未解消です。

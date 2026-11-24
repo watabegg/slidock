@@ -25,7 +25,7 @@ function run(bin, args, cwd) {
   return spawnSync(process.execPath, [bin, ...args], {
     cwd,
     encoding: 'utf8',
-    timeout: 20_000,
+    timeout: 60_000,
   });
 }
 
@@ -259,55 +259,62 @@ test('stage settings reject generated runtime keys before creating an output con
   });
 });
 
-test('slidock serve prints a ready JSON envelope after binding and closes on SIGTERM', async () => {
-  await withTempDir(async (cwd) => {
-    const site = path.join(cwd, 'site');
-    await mkdir(site);
-    await writeFile(path.join(site, 'index.html'), '<h1>served</h1>\n');
-    const child = spawn(
-      process.execPath,
-      [hubBin, 'serve', '--site', site, '--port', '0', '--json'],
-      {
-        cwd,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => (stdout += chunk));
-    child.stderr.on('data', (chunk) => (stderr += chunk));
-    await new Promise((accept, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error(`serve did not become ready: ${stderr}`)),
-        10_000,
+test(
+  'slidock serve prints a ready JSON envelope after binding and closes on SIGTERM',
+  { timeout: 90_000 },
+  async (t) => {
+    await withTempDir(async (cwd) => {
+      const site = path.join(cwd, 'site');
+      await mkdir(site);
+      await writeFile(path.join(site, 'index.html'), '<h1>served</h1>\n');
+      const child = spawn(
+        process.execPath,
+        [hubBin, 'serve', '--site', site, '--port', '0', '--json'],
+        {
+          cwd,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
       );
-      child.stdout.on('data', () => {
-        if (stdout.includes('\n')) {
+      t.after(() => {
+        if (child.exitCode === null) child.kill('SIGKILL');
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
+      child.stdout.on('data', (chunk) => (stdout += chunk));
+      child.stderr.on('data', (chunk) => (stderr += chunk));
+      await new Promise((accept, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error(`serve did not become ready: ${stderr}`)),
+          60_000,
+        );
+        child.stdout.on('data', () => {
+          if (stdout.includes('\n')) {
+            clearTimeout(timeout);
+            accept();
+          }
+        });
+        child.once('exit', (code) => {
           clearTimeout(timeout);
-          accept();
-        }
+          reject(new Error(`serve exited before ready (${code}): ${stderr}`));
+        });
       });
-      child.once('exit', (code) => {
-        clearTimeout(timeout);
-        reject(new Error(`serve exited before ready (${code}): ${stderr}`));
-      });
+      const envelope = JSON.parse(stdout.trim());
+      assert.equal(envelope.ok, true);
+      assert.equal(envelope.command, 'slidock serve');
+      assert.equal(envelope.data.site, site);
+      assert.match(envelope.data.origin, /^http:\/\//);
+      const response = await fetch(`${envelope.data.origin}/`);
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), '<h1>served</h1>\n');
+      child.kill('SIGTERM');
+      const [code, signal] = await once(child, 'exit');
+      assert.equal(signal, null);
+      assert.equal(code, 0, stderr);
     });
-    const envelope = JSON.parse(stdout.trim());
-    assert.equal(envelope.ok, true);
-    assert.equal(envelope.command, 'slidock serve');
-    assert.equal(envelope.data.site, site);
-    assert.match(envelope.data.origin, /^http:\/\//);
-    const response = await fetch(`${envelope.data.origin}/`);
-    assert.equal(response.status, 200);
-    assert.equal(await response.text(), '<h1>served</h1>\n');
-    child.kill('SIGTERM');
-    const [code, signal] = await once(child, 'exit');
-    assert.equal(signal, null);
-    assert.equal(code, 0, stderr);
-  });
-});
+  },
+);
 
 test('slive connect forwards private auth and reports no header or manifest detail', async () => {
   await withTempDir(async (cwd) => {

@@ -3,12 +3,22 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { packServer } from './pack-server.mjs';
 import { runProcess } from './pack-cli.mjs';
+import { configureInstallRetries } from './consumer-install.mjs';
 const destination = await mkdtemp(join(tmpdir(), 'hub-server-install-'));
 const output = resolve('artifacts/portability');
 await mkdir(output, { recursive: true });
 try {
   const result = await packServer(destination);
-  const install = await runProcess('pnpm', ['install', '--ignore-scripts'], { cwd: destination });
+  const install = await runProcess(
+    'pnpm',
+    [
+      'install',
+      '--prefer-offline',
+      '--ignore-scripts',
+      ...(await configureInstallRetries(destination, 'pnpm')),
+    ],
+    { cwd: destination },
+  );
   await writeFile(join(output, 'packed-install.log'), install.stdout + install.stderr);
   if (install.code !== 0) throw new Error('Private server package installation failed');
   await writeFile(

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { packCli, packageNames, runProcess } from './pack-cli.mjs';
+import { configureInstallRetries } from './consumer-install.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const evidence = join(repository, 'artifacts/step5');
@@ -39,9 +40,18 @@ async function cli(bin, args, expected = 0) {
 try {
   console.log('Packed CLI verification: pack and install');
   await packCli(install);
-  const installed = await runProcess('pnpm', ['install', '--prefer-offline', '--ignore-scripts'], {
-    cwd: install,
-  });
+  const installed = await runProcess(
+    'pnpm',
+    [
+      'install',
+      '--prefer-offline',
+      '--ignore-scripts',
+      ...(await configureInstallRetries(install, 'pnpm')),
+    ],
+    {
+      cwd: install,
+    },
+  );
   await writeFile(join(evidence, 'install.log'), installed.stdout + installed.stderr);
   assert.equal(installed.code, 0, installed.stderr);
   for (const name of packageNames) {
@@ -142,7 +152,7 @@ try {
     let buffer = '';
     const timer = setTimeout(
       () => reject(new Error('Packed slidock serve readiness timeout')),
-      15000,
+      60000,
     );
     server.once('error', (error) => {
       clearTimeout(timer);
